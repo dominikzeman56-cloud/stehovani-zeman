@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.vercel/
+.tanstack/
+
+# workspace artifacts
+screenshots/
+artifacts/
+attachments/
+*.log
+.grok/preview.log
+.grok/preview.pid
+.grok/status
+.node_modules.lock
+
+# secrets
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
