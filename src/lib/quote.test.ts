@@ -96,29 +96,29 @@ describe("computeQuote", () => {
       },
     });
 
-    assert.equal(quote.volume, 1.92);
-    assert.equal(quote.weight, 350);
+    assert.equal(quote.volume, 2.17);
+    assert.equal(quote.weight, 449);
     assert.equal(quote.trips, 1);
     assert.equal(quote.tripFee, TRIP_PRICE);
-    assert.equal(quote.items, 120 + 400 + 3000);
-    assert.equal(quote.floors, 320 + 750 + 1500);
+    assert.equal(quote.items, 40 * 2 + 280 + 3600);
+    assert.equal(quote.floors, FLOOR_RATES.light * 2 * 2 + FLOOR_RATES.heavy * 3 + FLOOR_RATES.very_heavy * 3);
     assert.equal(quote.handling, 200);
     assert.equal(quote.distanceKm, 66);
     assert.equal(quote.moveTimes, 1);
     assert.equal(quote.transport, 1320);
-    assert.equal(quote.net, 11610);
-    assert.equal(quote.vat, 2438);
+    assert.equal(quote.net, 10350);
+    assert.equal(quote.vat, 2174);
     assert.equal(quote.vat, vatCrowns(quote.net));
-    assert.equal(quote.gross, 14048);
+    assert.equal(quote.gross, 12524);
     assert.equal(quote.overweight, false);
     assert.equal(quote.manual, false);
   });
 
   it("další jízdu přidá až po překročení 18,73 m³, přesný násobek zůstane", () => {
-    assert.equal(quoteOf({ cart: { skrin_pos: 9 } }).trips, 1);
-    assert.equal(quoteOf({ cart: { skrin_pos: 9 } }).volume, 18);
-    assert.equal(quoteOf({ cart: { skrin_pos: 10 } }).trips, 2);
-    assert.equal(quoteOf({ cart: { skrin_pos: 10 } }).tripFee, TRIP_PRICE * 2);
+    assert.equal(quoteOf({ cart: { skrin_pos: 8 } }).trips, 1);
+    assert.ok(quoteOf({ cart: { skrin_pos: 8 } }).volume <= MAX_VOLUME_M3);
+    assert.equal(quoteOf({ cart: { skrin_pos: 9 } }).trips, 2);
+    assert.equal(quoteOf({ cart: { skrin_pos: 9 } }).tripFee, TRIP_PRICE * 2);
 
     const exact = quoteOf({
       extras: [{ id: "e", name: "Bedna", qty: 1, vol: MAX_VOLUME_M3, weight: 10, wCat: "light" }],
@@ -199,7 +199,7 @@ describe("computeQuote", () => {
     assert.equal(item("susicka").handling, undefined);
     assert.equal(quote.handling, 200 * 2 + 200);
     assert.equal(quote.floors, FLOOR_RATES.heavy * 2 * 4);
-    assert.equal(quote.items, 400 * 2 + 400 + 400);
+    assert.equal(quote.items, 280 * 2 + 260 + 250);
   });
 
   it("násobí trasu stěhování počtem jízd, nájezd a návrat jen jednou", () => {
@@ -249,9 +249,9 @@ describe("computeQuote", () => {
     assert.equal(quote.manual, true);
     assert.equal(quote.distanceKm, 0);
     assert.equal(quote.transport, 0);
-    assert.equal(quote.net, 4060);
-    assert.equal(quote.vat, 853);
-    assert.equal(quote.gross, 4913);
+    assert.equal(quote.net, 3040);
+    assert.equal(quote.vat, 638);
+    assert.equal(quote.gross, 3678);
   });
 
   it("nečíselné nebo záporné km nechají spočítanou trasu", () => {
@@ -264,7 +264,7 @@ describe("computeQuote", () => {
     assert.equal(junk.manual, false);
     assert.equal(junk.distanceKm, 50);
     assert.equal(junk.transport, 1000);
-    assert.equal(junk.net, 5060);
+    assert.equal(junk.net, 4040);
 
     const negative = quoteOf({
       cart: { karton_s: 1 },
@@ -285,16 +285,19 @@ describe("computeQuote", () => {
   });
 
   it("DPH zaokrouhlí půlkorunu nahoru a hmotnost sama o sobě jízdu nepřidá", () => {
-    const half = quoteOf({ cart: { taska: 1 }, useManual: true, manualKm: 0.5 });
-    assert.equal(half.transport, 10);
-    assert.equal(half.net, 4050);
-    assert.equal(half.vat, 851);
+    const halfKm = quoteOf({ cart: { taska: 1 }, useManual: true, manualKm: 0.5 });
+    assert.equal(halfKm.transport, 10);
+    assert.equal(halfKm.net, 3040);
+
+    const half = quoteOf({ cart: { taska: 1 }, useManual: true, manualKm: 1 });
+    assert.equal(half.net, 3050);
+    assert.equal(half.vat, 641);
     assert.equal(half.gross, half.net + half.vat);
     assert.equal(half.vat, vatCrowns(half.net));
     assert.notEqual(half.vat, Math.floor(half.net * 0.21));
 
     const load = quoteOf({ cart: { trezor_v: 5 } });
-    assert.equal(load.weight, 1500);
+    assert.equal(load.weight, 2000);
     assert.equal(load.trips, 1);
     assert.equal(load.overweight, true);
     assert.equal(load.tripFee, TRIP_PRICE);

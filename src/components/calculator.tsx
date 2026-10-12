@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, Loader2, Minus, Plus, Route, Search, Trash2 } from "lucide-react";
-import { CATEGORIES, COMPANY, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Copy, ImagePlus, Loader2, Minus, Plus, Route, Search, Trash2, X } from "lucide-react";
+import { CATEGORIES, COMPANY, ESTIMATE_CAVEAT, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
 import { computeQuote, formatKc, formatKm, formatVolume, readManualKm, type Cart, type ExtraItem, type RouteLegs } from "@/lib/quote";
-import { VanLoad } from "@/components/van-load";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 const STORAGE_KEY = "zeman-kalkulacka-v1";
+const MAX_PHOTOS = 6;
+const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
+
+type Photo = { id: string; file: File; url: string };
 
 type Saved = {
   cart: Cart;
@@ -98,13 +101,35 @@ function tripWord(count: number) {
 }
 
 function loadNote(volume: number, trips: number) {
-  if (volume <= 0.001) return "Prázdná dodávka. Do jedné jízdy se vejde i byt 3+1.";
+  if (volume <= 0.001) return "Zatím prázdno. Do jedné jízdy se vejde i byt 3+1.";
   if (trips <= 1 && volume < FLAT_31_M3) return "Ještě je místo. Byt 3+1 se vejde najednou.";
-  if (trips <= 1) return "Jedna jízda — i byt 3+1 se sem vejde.";
+  if (trips <= 1) return "Jedna jízda. I byt 3+1 se sem vejde.";
   return `To už je ${tripWord(trips)}. Každá další jízda je ${formatKc(TRIP_PRICE)}.`;
 }
 
-function buildMail(saved: Saved, legs: RouteLegs | null) {
+function rideFill(volume: number) {
+  if (volume <= 0) return 0;
+  const rest = volume % MAX_VOLUME_M3;
+  if (rest < 0.001) return 1;
+  return rest / MAX_VOLUME_M3;
+}
+
+function photoMailLine(count: number) {
+  if (count <= 0) return "Fotky: žádné";
+  const word = count === 1 ? "1 fotka" : count < 5 ? `${count} fotky` : `${count} fotek`;
+  return `Fotky: ${word}. Z počítače je prohlížeč do mailu sám nedá, je potřeba je přiložit.`;
+}
+
+function canSharePhotos(files: File[]) {
+  if (!files.length || typeof navigator.share !== "function" || typeof navigator.canShare !== "function") return false;
+  try {
+    return navigator.canShare({ files });
+  } catch {
+    return false;
+  }
+}
+
+function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
   const quote = computeQuote({
     cart: saved.cart,
     floorsFrom: saved.floorsFrom,
@@ -141,7 +166,8 @@ function buildMail(saved: Saved, legs: RouteLegs | null) {
     `Vzdálenost k fakturaci: ${formatKm(quote.distanceKm)}${quote.manual ? " (zadáno ručně)" : ""}`,
     `Demontáž nábytku: ${saved.disassembly ? "ano" : "ne"}`,
     `Zabalit křehké: ${saved.packing ? "ano" : "ne"}`,
-    saved.note ? `Poznámka: ${saved.note}` : "",
+    saved.note.trim() ? `Přístup a poznámka: ${saved.note.trim()}` : "Přístup a poznámka: neuvedeno",
+    photoMailLine(photoCount),
     "",
     "ODHAD BEZ DPH",
     `Základní jízda: ${formatKc(quote.tripFee)}`,
@@ -153,7 +179,7 @@ function buildMail(saved: Saved, legs: RouteLegs | null) {
     `DPH 21 %: ${formatKc(quote.vat)}`,
     `Celkem s DPH: ${formatKc(quote.gross)}`,
     "",
-    "Jde o orientační výpočet. Finální cenu prosím potvrďte.",
+    ESTIMATE_CAVEAT,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -175,6 +201,9 @@ export function Calculator() {
   const [draftVol, setDraftVol] = useState("");
   const [draftWeight, setDraftWeight] = useState("");
   const [draftClass, setDraftClass] = useState<WeightClass>("medium");
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
 
   useEffect(() => {
     try {
@@ -199,6 +228,12 @@ export function Calculator() {
     if (!ready) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
   }, [saved, ready]);
+
+  useEffect(() => {
+    return () => {
+      photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url));
+    };
+  }, []);
 
   const quote = useMemo(
     () =>
@@ -299,8 +334,44 @@ export function Calculator() {
     }
   }
 
+  function addPhotos(list: FileList | null) {
+    if (!list?.length) return;
+    const files = Array.from(list);
+    const images = files.filter((file) => file.type.startsWith("image/"));
+    const oversized = images.filter((file) => file.size > MAX_PHOTO_BYTES);
+    const ok = images.filter((file) => file.size <= MAX_PHOTO_BYTES);
+    const room = MAX_PHOTOS - photos.length;
+    const taken = ok.slice(0, Math.max(0, room)).map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      url: URL.createObjectURL(file),
+    }));
+    if (taken.length) setPhotos((current) => [...current, ...taken]);
+    const notes: string[] = [];
+    if (images.length < files.length) notes.push("Jdou jen fotky.");
+    if (oversized.length) notes.push("Fotka nad 12 MB se nevešla.");
+    if (ok.length > room) notes.push(`Nejvíc ${MAX_PHOTOS} fotek.`);
+    if (notes.length) setNotice(notes.join(" "));
+  }
+
+  function removePhoto(id: string) {
+    setPhotos((current) => {
+      const hit = current.find((photo) => photo.id === id);
+      if (hit) URL.revokeObjectURL(hit.url);
+      return current.filter((photo) => photo.id !== id);
+    });
+  }
+
+  function clearPhotos() {
+    setPhotos((current) => {
+      current.forEach((photo) => URL.revokeObjectURL(photo.url));
+      return [];
+    });
+  }
+
   function clearAll() {
     setSaved(EMPTY);
+    clearPhotos();
     setLegs(null);
     setRouteError("");
     setQuery("");
@@ -315,15 +386,29 @@ export function Calculator() {
       document.getElementById("poptavka-jmeno")?.focus();
       return;
     }
-    const { body } = buildMail(saved, legs);
+    const files = photos.map((photo) => photo.file);
+    const { body } = buildMail(saved, legs, files.length);
+    if (canSharePhotos(files)) {
+      try {
+        await navigator.share({ files, title: "Poptávka stěhování z webu", text: body });
+        setNotice("Poptávka i fotky šly do sdílení. Vyberte mail a odešlete.");
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
     const href = `mailto:${COMPANY.email}?subject=${encodeURIComponent("Poptávka stěhování z webu")}&body=${encodeURIComponent(body)}`;
     window.location.href = href;
-    setNotice("Otevírá se e-mail. Když se nic nestane, text poptávky zkopírujte.");
+    setNotice(
+      files.length
+        ? "Mail se otevřel bez fotek. Prohlížeč je k němu nepřipojí — přetáhněte je do zprávy."
+        : "Otevírá se e-mail. Když se nic nestane, text poptávky zkopírujte.",
+    );
   }
 
   async function copyQuote() {
     if (!quote.lines.length) return;
-    const { body } = buildMail(saved, legs);
+    const { body } = buildMail(saved, legs, photos.length);
     try {
       await navigator.clipboard.writeText(body);
       setNotice("Text poptávky je ve schránce.");
@@ -338,7 +423,7 @@ export function Calculator() {
 
   return (
     <div className="grid w-full min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
-      <div className="min-w-0 overflow-hidden border border-line bg-sheet">
+      <div className="min-w-0 overflow-hidden rounded-card border border-line bg-sheet shadow-sm">
         <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="font-display text-sm uppercase tracking-widest text-accent">Kusy</p>
@@ -396,6 +481,7 @@ export function Calculator() {
                     <span className="block font-semibold">{item.name}</span>
                     <span className="block text-xs text-muted">
                       {formatVolume(item.vol)} · {item.weight} kg · {WEIGHT_LABEL[item.wCat]}
+                      {item.bulky ? " · po schodech jako velmi těžké" : ""}
                     </span>
                   </button>
                   <div className="flex items-center gap-1">
@@ -527,31 +613,32 @@ export function Calculator() {
         </form>
       </div>
 
-      <aside id="souhrn" className="scroll-mt-24 overflow-hidden bg-ink text-paper lg:sticky lg:top-20">
-        <VanLoad volume={quote.volume} />
+      <aside id="souhrn" className="scroll-mt-24 overflow-hidden rounded-card bg-ink text-paper shadow-sm lg:sticky lg:top-20">
         <div className="p-5">
         <div className="flex items-baseline justify-between gap-3">
-          <h3 className="font-display text-xl uppercase tracking-wide">Nákladový list</h3>
+          <h3 className="font-display text-2xl uppercase tracking-wide">Nákladový list</h3>
           <span className="text-sm text-paper/70">{pieceCount} ks</span>
         </div>
-        <div className="mt-3">
-          <div className="mb-1 flex justify-between text-xs uppercase tracking-widest text-paper/70">
-            <span>{formatVolume(quote.volume)}</span>
-            <span>{MAX_VOLUME_M3.toLocaleString("cs-CZ")} m³</span>
+        <div className="mt-4">
+          <div className="mb-2 flex items-end justify-between gap-3">
+            <p className="font-display text-4xl leading-none">{formatVolume(quote.volume)}</p>
+            <p className="text-xs uppercase tracking-widest text-paper/60">
+              z {MAX_VOLUME_M3.toLocaleString("cs-CZ")} m³
+            </p>
           </div>
           <div
-            className="h-1.5 overflow-hidden bg-ink-soft"
+            className="relative h-3 overflow-hidden rounded-full bg-ink-soft"
             role="meter"
             aria-label="Zaplnění aktuální jízdy"
             aria-valuemin={0}
             aria-valuemax={MAX_VOLUME_M3}
-            aria-valuenow={Math.round(quote.volume <= 0 ? 0 : quote.volume % MAX_VOLUME_M3 < 0.001 && quote.volume > 0 ? MAX_VOLUME_M3 : quote.volume % MAX_VOLUME_M3)}
+            aria-valuenow={Math.round(rideFill(quote.volume) * MAX_VOLUME_M3)}
           >
-            <div
-              className="h-full bg-accent transition-[width] duration-700 ease-out"
-              style={{
-                width: `${Math.min(100, ((quote.volume <= 0 ? 0 : quote.volume % MAX_VOLUME_M3 < 0.001 && quote.volume > 0 ? MAX_VOLUME_M3 : quote.volume % MAX_VOLUME_M3) / MAX_VOLUME_M3) * 100)}%`,
-              }}
+            <div className="load-fill h-full rounded-full bg-accent" style={{ width: `${rideFill(quote.volume) * 100}%` }} />
+            <span
+              className="absolute inset-y-0 z-10 w-0.5 bg-sky"
+              style={{ left: `${(FLAT_31_M3 / MAX_VOLUME_M3) * 100}%` }}
+              title="Byt 3+1"
             />
           </div>
           <p className="mt-2 text-sm text-paper/80">{loadNote(quote.volume, quote.trips)}</p>
@@ -567,7 +654,7 @@ export function Calculator() {
           {quote.lines.length === 0 && <li className="text-paper/60">Přidejte první kus vlevo.</li>}
           {quote.lines.map((line) => (
             <li key={line.id} className="border-b border-paper/10 py-1 text-paper/85">
-              {line.name} <span className="text-kraft">×{line.qty}</span>
+              {line.name} <span className="text-sky">×{line.qty}</span>
             </li>
           ))}
         </ul>
@@ -680,6 +767,7 @@ export function Calculator() {
             <dd className="font-semibold">{formatKc(quote.gross)}</dd>
           </div>
         </dl>
+        <p className="mt-3 text-sm leading-relaxed text-paper/75">{ESTIMATE_CAVEAT}</p>
 
         <div id="poptavka" className="mt-4 scroll-mt-24 border-t border-paper/15 pt-4">
           <h4 className="font-display uppercase tracking-wide">Poptávka</h4>
@@ -712,13 +800,52 @@ export function Calculator() {
               aria-label="Termín"
               className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm text-ink"
             />
-            <textarea
-              value={saved.note}
-              onChange={(event) => patch({ note: event.target.value })}
-              placeholder="Poznámka: přístup, parkování, co v seznamu není"
-              rows={3}
-              className="rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink"
-            />
+            <label className="block text-sm text-paper/80">
+              Přístup a co kalkulačka nevidí
+              <textarea
+                value={saved.note}
+                onChange={(event) => patch({ note: event.target.value })}
+                placeholder="Úzké schody na půdu, sklep, točité schodiště, parkování daleko, zatáčka na podestě."
+                rows={4}
+                className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink"
+              />
+            </label>
+            <div>
+              <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-paper/30 px-3 text-sm text-paper/80">
+                <ImagePlus className="size-4" />
+                Přidat fotky přístupu
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    addPhotos(event.target.files);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+              <p className="mt-1 text-xs text-paper/50">
+                Nejvíc {MAX_PHOTOS}. Z počítače je do mailu přiložte ručně, telefon je umí poslat rovnou.
+              </p>
+              {photos.length > 0 && (
+                <ul className="mt-2 grid grid-cols-3 gap-2">
+                  {photos.map((photo) => (
+                    <li key={photo.id} className="relative">
+                      <img src={photo.url} alt="" className="h-16 w-full rounded-md object-cover" />
+                      <button
+                        type="button"
+                        aria-label={`Odebrat fotku ${photo.file.name}`}
+                        onClick={() => removePhoto(photo.id)}
+                        className="absolute top-1 right-1 flex size-7 items-center justify-center rounded-full bg-ink/80 text-paper"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -748,7 +875,7 @@ export function Calculator() {
             <Trash2 className="size-4" /> Vymazat
           </button>
           {notice && (
-            <p className="mt-2 flex items-start gap-2 text-sm text-kraft">
+            <p className="mt-2 flex items-start gap-2 text-sm text-sky">
               <Check className="mt-0.5 size-4 shrink-0" /> {notice}
             </p>
           )}

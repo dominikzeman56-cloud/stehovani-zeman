@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Mail, MapPin, Menu, Phone, X } from "lucide-react";
-import { COMPANY, FLOOR_RATES, MAX_VOLUME_M3, PRICE_PER_KM, TRIP_PRICE } from "@/data/catalog";
+import { COMPANY, ESTIMATE_CAVEAT, FLOOR_RATES, MAX_VOLUME_M3, PRICE_PER_KM, TRIP_PRICE } from "@/data/catalog";
 import { formatKc } from "@/lib/quote";
 import { Calculator } from "@/components/calculator";
 import { Reveal } from "@/components/reveal";
@@ -96,8 +96,8 @@ export function HomePage() {
       </a>
       <header
         className={cn(
-          "sticky top-0 z-30 border-b border-line bg-paper/95 text-ink backdrop-blur-sm transition-shadow duration-300",
-          scrolled && "shadow-[0_12px_30px_-20px_rgba(28,20,16,0.6)]",
+          "sticky top-0 z-30 border-b border-line bg-paper/90 text-ink backdrop-blur-md transition-shadow duration-300",
+          scrolled && "shadow-md",
         )}
       >
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2">
@@ -192,14 +192,16 @@ export function HomePage() {
         </section>
 
         <Reveal as="figure" className="border-b border-line">
-          <img
-            src="/photos/vuz.jpg"
-            alt="Bílé IVECO Daily před žlutou historickou budovou"
-            className="h-72 w-full object-cover sm:h-96"
-          />
+          <div className="hero-frame">
+            <img
+              src="/photos/vuz.jpg"
+              alt="Bílé IVECO Daily před žlutou historickou budovou"
+              className="hero-photo"
+            />
+          </div>
           <figcaption className="mx-auto flex max-w-6xl items-baseline justify-between gap-4 px-4 py-3 text-sm text-muted">
             <span>Výjezd. IVECO Daily, SPZ 8C7 8206.</span>
-            <span className="font-script text-2xl text-accent">S námi je vše lehké</span>
+            <span className="font-display text-2xl tracking-wide text-accent uppercase">S námi je vše lehké</span>
           </figcaption>
         </Reveal>
 
@@ -212,7 +214,7 @@ export function HomePage() {
                   as="li"
                   key={service.title}
                   delay={index * 60}
-                  className="grid gap-2 border-b border-line py-5 md:grid-cols-[4rem_14rem_1fr] md:gap-6"
+                  className="grid gap-2 border-b border-line py-5 transition-colors duration-200 hover:bg-sheet md:grid-cols-[4rem_14rem_1fr] md:gap-6"
                 >
                   <span className="font-display text-2xl text-accent">{String(index + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-2xl">{service.title}</h3>
@@ -231,30 +233,36 @@ export function HomePage() {
             <SectionTitle
               kicker="Orientační ceník"
               title="Kalkulačka"
-              text="Sestavte náklad, patra a trasu. Číslo je odhad bez DPH — konečnou cenu potvrdíme po telefonu nebo prohlídce. Čekání na odemčení objektu, balení a demontáž v částce nejsou, dokud je nenapíšete do poptávky."
+              text="Sestavte náklad, patra a trasu. Číslo je odhad bez DPH. Čekání na odemčení objektu, balení a demontáž v částce nejsou, dokud je nenapíšete do poptávky. Přístup, který kalkulačka nevidí, popište dole a klidně ho vyfoťte."
             />
             <Reveal className="mt-8" delay={80}>
               <Calculator />
             </Reveal>
-            <details className="mt-6 border border-line bg-paper p-5">
+            <details className="mt-6 rounded-card border border-line bg-paper p-5">
               <summary className="cursor-pointer font-display text-xl">Jak se cena skládá</summary>
               <ul className="mt-4 space-y-2 text-sm text-muted">
                 <li>
-                  Základní jízda {formatKc(TRIP_PRICE)} bez DPH. Další jízda začíná, jakmile objem přesáhne{" "}
-                  {MAX_VOLUME_M3.toLocaleString("cs-CZ")} m³.
+                  Základní jízda {formatKc(TRIP_PRICE)} bez DPH je přistavení vozu a posádky. Další jízda začíná, jakmile
+                  objem přesáhne {MAX_VOLUME_M3.toLocaleString("cs-CZ")} m³. Když je věcí málo, cenu po telefonu srovnáme.
                 </li>
                 <li>
                   Každý kus má sazbu za naložení a složení. Patro navíc: lehké {formatKc(FLOOR_RATES.light)}, střední{" "}
                   {formatKc(FLOOR_RATES.medium)}, těžké {formatKc(FLOOR_RATES.heavy)}, velmi těžké{" "}
-                  {formatKc(FLOOR_RATES.very_heavy)} za patro a kus. Přízemí je nula.
+                  {formatKc(FLOOR_RATES.very_heavy)} za patro a kus. Krabice po schodech skoro nic nestojí. Piano a trezor
+                  ano. Posuvná skříň a křídlo jsou dlouhé: v paneláku se s nimi na podestě neotočí, takže patra mají
+                  sazbu velmi těžkého kusu, i když skříň nemá kila piana. Přízemí je nula.
                 </li>
-                <li>Osobní výtah: příplatek jen u těžkých a velmi těžkých kusů. Nákladní výtah patra neúčtuje.</li>
+                <li>
+                  Osobní výtah: příplatek jen u těžkých a velmi těžkých kusů a u dlouhých, co se do něj nevejdou.
+                  Nákladní výtah patra neúčtuje.
+                </li>
                 <li>Pračka a myčka mají 200 Kč za odpojení a fixaci, patra se k tomu počítají zvlášť.</li>
                 <li>
                   Dopravné {PRICE_PER_KM} Kč/km. Trasa umí nájezd ze sídla, cestu stěhování krát počet jízd a návrat.
                   Kilometry jdou zadat i ručně.
                 </li>
                 <li>K ceně se připočte DPH 21 %. Pojištění je u České pojišťovny. Montáž polic a regálů nenabízíme.</li>
+                <li>{ESTIMATE_CAVEAT}</li>
               </ul>
             </details>
           </div>
@@ -267,7 +275,7 @@ export function HomePage() {
               {PHOTOS.map((item, index) => (
                 <Reveal as="figure" key={item.src} delay={index * 90}>
                   <button type="button" onClick={() => setPhoto(item)} className="group block w-full text-left">
-                    <span className="block overflow-hidden border border-line">
+                    <span className="block overflow-hidden rounded-card border border-line">
                       <img
                         src={item.src}
                         alt={item.alt}
@@ -363,7 +371,7 @@ export function HomePage() {
             </div>
             <iframe
               title="Mapa sídla, Claudiusova 413, Jindřichův Hradec"
-              className="h-96 w-full border border-line"
+              className="h-96 w-full rounded-card border border-line"
               src={`https://www.openstreetmap.org/export/embed.html?bbox=${(COMPANY.depot.lon - 0.008).toFixed(3)}%2C${(COMPANY.depot.lat - 0.005).toFixed(3)}%2C${(COMPANY.depot.lon + 0.008).toFixed(3)}%2C${(COMPANY.depot.lat + 0.005).toFixed(3)}&layer=mapnik&marker=${COMPANY.depot.lat}%2C${COMPANY.depot.lon}`}
             />
           </Reveal>
@@ -438,7 +446,7 @@ function SectionTitle({ kicker, title, text }: { kicker: string; title: string; 
   return (
     <Reveal className="max-w-2xl">
       <p className="text-sm tracking-widest text-accent uppercase">{kicker}</p>
-      <span className="mt-2 block h-0.5 w-12 bg-accent" aria-hidden="true" />
+      <span className="kicker-rule mt-2 block h-0.5 w-12 bg-accent" aria-hidden="true" />
       <h2 className="mt-3 font-display text-4xl leading-tight">{title}</h2>
       {text && <p className="mt-4 text-muted">{text}</p>}
     </Reveal>

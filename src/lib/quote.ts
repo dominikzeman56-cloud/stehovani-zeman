@@ -6,6 +6,7 @@ import {
   PRICE_PER_KM,
   TRIP_PRICE,
   VAT_RATE,
+  stairClass,
   type LiftKind,
   type WeightClass,
 } from "@/data/catalog";
@@ -143,10 +144,11 @@ export function computeQuote(input: QuoteInput): Quote {
   for (const item of ITEMS) {
     const qty = input.cart[item.id] ?? 0;
     if (qty <= 0) continue;
+    const stair = stairClass(item);
     const units =
-      floorUnits(input.floorsFrom, input.liftFrom, item.wCat) +
-      floorUnits(input.floorsTo, input.liftTo, item.wCat);
-    const floor = FLOOR_RATES[item.wCat] * units * qty;
+      floorUnits(input.floorsFrom, input.liftFrom, stair) +
+      floorUnits(input.floorsTo, input.liftTo, stair);
+    const floor = FLOOR_RATES[stair] * units * qty;
     const handle = (item.handling ?? 0) * qty;
     const price = item.price * qty;
     volume += item.vol * qty;

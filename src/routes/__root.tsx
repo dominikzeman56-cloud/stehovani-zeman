@@ -16,7 +16,7 @@ export const Route = createRootRoute({
         content:
           "Stěhování bytů, kanceláří, zámků a citlivého zboží. Václav Zeman, Jindřichův Hradec, od roku 1987. Orientační kalkulačka a IVECO Daily 18,73 m³.",
       },
-      { name: "theme-color", content: "#1c1410" },
+      { name: "theme-color", content: "#14181d" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -27,7 +27,7 @@ export const Route = createRootRoute({
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Fraunces:ital,opsz,wght@0,9..144,560;0,9..144,680;1,9..144,560&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap",
       },
     ],
   }),

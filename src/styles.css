@@ -2,22 +2,20 @@
 @import "tw-animate-css";
 
 @theme {
-  --font-display: "Fraunces", Georgia, serif;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
   --font-sans: "Source Sans 3", "Segoe UI", sans-serif;
-  --font-script: "Caveat", cursive;
 
-  --color-ink: #1c1410;
-  --color-ink-soft: #2e241e;
-  --color-paper: #f3eee4;
-  --color-sheet: #faf6ef;
-  --color-kraft: #c6a36a;
-  --color-kraft-deep: #6b4e2e;
-  --color-accent: #c4272e;
-  --color-accent-deep: #8e1c22;
-  --color-line: #e3d6c4;
-  --color-muted: #5c5148;
+  --color-ink: #14181d;
+  --color-ink-soft: #1e252c;
+  --color-paper: #f4f8fb;
+  --color-sheet: #ffffff;
+  --color-sky: #c5d9ea;
+  --color-accent: #d0121a;
+  --color-accent-deep: #9d0d13;
+  --color-line: #d5dee6;
+  --color-muted: #4e5963;
 
-  --radius-card: 0.125rem;
+  --radius-card: 0.75rem;
 }
 
 @layer base {
@@ -45,25 +43,43 @@
   }
 }
 
-/* scroll-reveal entrance (src/components/reveal.tsx) */
 .reveal {
   opacity: 0;
-  transform: translateY(1.25rem);
+  transform: translateY(0.75rem);
   transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .reveal.reveal-in {
   opacity: 1;
   transform: none;
 }
 
-/* backdrop gradient behind the 3D van stage */
-.van-stage {
-  background: radial-gradient(130% 95% at 50% 0%, #453629 0%, #2e241e 55%, #221a15 100%);
+.kicker-rule {
+  transform-origin: left;
+  animation: rule-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* animated underline for header navigation */
+.load-fill {
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hero-frame {
+  height: clamp(28rem, 78vh, 52rem);
+  overflow: hidden;
+  background: var(--color-ink);
+}
+
+.hero-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 66%;
+  transform-origin: center 62%;
+  animation: hero-drift 18s ease-in-out infinite alternate;
+}
+
 .nav-link {
   position: relative;
 }
@@ -77,11 +93,31 @@
   background: var(--color-accent);
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .nav-link:hover::after,
 .nav-link:focus-visible::after {
   transform: scaleX(1);
+}
+
+@keyframes rule-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes hero-drift {
+  from {
+    object-position: center 62%;
+    transform: scale(1.04);
+  }
+  to {
+    object-position: center 70%;
+    transform: scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
