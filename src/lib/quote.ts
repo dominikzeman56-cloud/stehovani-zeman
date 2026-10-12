@@ -39,7 +39,7 @@ export type QuoteInput = {
   legs: RouteLegs | null;
   includeApproach: boolean;
   includeReturn: boolean;
-  /** Když true, `manualKm` je celková fakturovaná vzdálenost a trasa se ignoruje. */
+  /** Když true, `manualKm` je celková fakturovaná vzdálenost (včetně nuly) a trasa se ignoruje. */
   useManual: boolean;
   manualKm: number;
   extras?: ExtraItem[];
@@ -124,6 +124,14 @@ function roundKm(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+/** Prázdné pole je 0. Nečíselný text je NaN, aby se nula nespletla s neplatným vstupem. */
+export function readManualKm(raw: string): number {
+  const text = raw.trim().replace(",", ".");
+  if (!text) return 0;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : Number.NaN;
+}
+
 export function computeQuote(input: QuoteInput): Quote {
   const lines: QuoteLine[] = [];
   let volume = 0;
@@ -191,7 +199,7 @@ export function computeQuote(input: QuoteInput): Quote {
   let returnKm = 0;
   let moveTimes = 0;
   let minutes = 0;
-  const manual = input.useManual && input.manualKm > 0 && trips > 0;
+  const manual = input.useManual && Number.isFinite(input.manualKm) && input.manualKm >= 0 && trips > 0;
 
   if (manual) {
     moveKm = input.manualKm;

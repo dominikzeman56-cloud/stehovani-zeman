@@ -29,7 +29,8 @@ export const COMPANY = {
   street: "Claudiusova 413/II",
   city: "377 01 Jindřichův Hradec",
   since: 1987,
-  depot: { lat: 49.1438, lon: 15.0045 },
+  /** Claudiusova 413/II. Předtím tu byla Svatojánská 155, asi 600 m vedle. */
+  depot: { lat: 49.1485367, lon: 15.0078986 },
 } as const;
 
 /** IVECO Daily 3.0, nákladový prostor změřený firmou. */

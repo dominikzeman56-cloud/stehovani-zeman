@@ -364,7 +364,7 @@ export function HomePage() {
             <iframe
               title="Mapa sídla, Claudiusova 413, Jindřichův Hradec"
               className="h-96 w-full border border-line"
-              src="https://www.openstreetmap.org/export/embed.html?bbox=14.990%2C49.136%2C15.018%2C49.152&layer=mapnik&marker=49.1438%2C15.0045"
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${(COMPANY.depot.lon - 0.008).toFixed(3)}%2C${(COMPANY.depot.lat - 0.005).toFixed(3)}%2C${(COMPANY.depot.lon + 0.008).toFixed(3)}%2C${(COMPANY.depot.lat + 0.005).toFixed(3)}&layer=mapnik&marker=${COMPANY.depot.lat}%2C${COMPANY.depot.lon}`}
             />
           </Reveal>
         </section>
@@ -422,7 +422,7 @@ export function HomePage() {
             className="max-h-full max-w-4xl animate-in zoom-in-95 fade-in-0 duration-200"
             onClick={(event) => event.stopPropagation()}
           >
-            <img src={photo.src} alt={photo.alt} className="max-h-full w-full object-contain" />
+            <img src={photo.src} alt={photo.alt} className="max-h-[70vh] w-full object-contain" />
             <figcaption className="mt-3 text-paper">
               <span className="font-display text-2xl">{photo.title}</span>
               <span className="mt-1 block text-sm text-paper/70">{photo.text}</span>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, Loader2, Minus, Plus, Route, Search, Trash2 } from "lucide-react";
 import { CATEGORIES, COMPANY, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
-import { computeQuote, formatKc, formatKm, formatVolume, type Cart, type ExtraItem, type RouteLegs } from "@/lib/quote";
+import { computeQuote, formatKc, formatKm, formatVolume, readManualKm, type Cart, type ExtraItem, type RouteLegs } from "@/lib/quote";
 import { VanLoad } from "@/components/van-load";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -115,7 +115,7 @@ function buildMail(saved: Saved, legs: RouteLegs | null) {
     includeApproach: saved.includeApproach,
     includeReturn: saved.includeReturn,
     useManual: saved.useManual,
-    manualKm: Number(saved.manual.replace(",", ".")) || 0,
+    manualKm: readManualKm(saved.manual),
     extras: saved.extras,
   });
   const list = quote.lines.map((line) => `  • ${line.name} ×${line.qty}  (${formatVolume(line.volume)})`).join("\n");
@@ -212,7 +212,7 @@ export function Calculator() {
         includeApproach: saved.includeApproach,
         includeReturn: saved.includeReturn,
         useManual: saved.useManual,
-        manualKm: Number(saved.manual.replace(",", ".")) || 0,
+        manualKm: readManualKm(saved.manual),
         extras: saved.extras,
       }),
     [saved, legs],
