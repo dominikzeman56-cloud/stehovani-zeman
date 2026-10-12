@@ -45,19 +45,22 @@ const SERVICES = [
 
 const PHOTOS = [
   {
-    src: "/photos/vuz.jpg",
+    src: "/photos/vuz-1535.webp",
+    srcSet: "/photos/vuz-800.webp 800w, /photos/vuz-1535.webp 1535w",
     alt: "Bílé IVECO Daily Stěhování Zeman před žlutou historickou budovou",
     title: "Výjezd k zámku",
     text: "IVECO Daily do 3,5 t, náklad 18,73 m³.",
   },
   {
-    src: "/photos/naklad.jpg",
+    src: "/photos/naklad-1200.webp",
+    srcSet: "/photos/naklad-700.webp 700w, /photos/naklad-1200.webp 1200w",
     alt: "Nakladač zvedá kamennou desku, vedle stojí posádka",
     title: "Těžký kus",
     text: "Když se věc nevejde do rukou, přijede technika.",
   },
   {
-    src: "/photos/poliklinika.png",
+    src: "/photos/poliklinika.webp",
+    srcSet: "/photos/poliklinika.webp 651w",
     alt: "Dva muži u zabalené vysoké zásilky před vchodem do polikliniky",
     title: "Poliklinika",
     text: "Citlivá zásilka zabalená a dovezená až ke dveřím.",
@@ -74,7 +77,16 @@ export function HomePage() {
   const [open, setOpen] = useState(false);
   const [photo, setPhoto] = useState<(typeof PHOTOS)[number] | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [inCalculator, setInCalculator] = useState(false);
   const phone = COMPANY.phones[0];
+
+  useEffect(() => {
+    const target = document.getElementById("kalkulacka");
+    if (!target) return;
+    const observer = new IntersectionObserver(([entry]) => setInCalculator(entry.isIntersecting), { threshold: 0 });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -102,21 +114,21 @@ export function HomePage() {
       </a>
       <header
         className={cn(
-          "sticky top-0 z-30 border-b border-line bg-paper/90 text-ink backdrop-blur-md transition-shadow duration-300",
-          scrolled && "shadow-md",
+          "sticky top-3 z-30 mx-3 mt-3 rounded-full border border-line/80 bg-white/75 text-ink backdrop-blur-xl transition-shadow duration-300 md:mx-auto md:max-w-6xl",
+          scrolled ? "shadow-[0_10px_30px_-10px_rgb(20_24_29/0.25)]" : "shadow-soft",
         )}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2">
+        <div className="flex items-center justify-between gap-4 py-1.5 pr-2 pl-5">
           <a href="#obsah" className="min-w-0">
             <img
               src="/logo.png"
               alt="Stěhování, nákladní doprava, V. Zeman, Jindřichův Hradec"
-              className="h-12 w-auto max-w-[16rem] md:h-14 md:max-w-none"
+              className="h-10 w-auto max-w-[14rem] md:h-11 md:max-w-none"
             />
           </a>
           <nav className="hidden items-center gap-6 md:flex" aria-label="Hlavní">
             {NAV.map((item) => (
-              <a key={item.href} href={item.href} className="nav-link text-sm text-muted transition-colors hover:text-accent">
+              <a key={item.href} href={item.href} className="nav-link text-sm font-medium text-muted transition-colors hover:text-ink">
                 {item.label}
               </a>
             ))}
@@ -135,7 +147,7 @@ export function HomePage() {
         </div>
         {open && (
           <nav
-            className="flex animate-in fade-in-0 flex-col gap-1 border-t border-line px-4 py-3 duration-150 md:hidden"
+            className="absolute inset-x-0 top-full mt-2 flex animate-in fade-in-0 slide-in-from-top-2 flex-col gap-1 rounded-3xl border border-line bg-white/95 px-5 py-4 shadow-lift backdrop-blur-xl duration-200 md:hidden"
             aria-label="Mobilní"
           >
             {NAV.map((item) => (
@@ -156,30 +168,46 @@ export function HomePage() {
       </header>
 
       <main id="obsah">
-        <section className="border-b border-line">
-          <div className="hero-intro">
-            <img src="/photos/vuz.jpg" alt="Bílé IVECO Daily před žlutou historickou budovou" className="hero-intro-photo" />
+        <section className="px-3 pt-3 md:px-4">
+          <div className="hero-intro mx-auto max-w-[88rem]">
+            <img
+              src="/photos/vuz-1535.webp"
+              srcSet="/photos/vuz-800.webp 800w, /photos/vuz-1535.webp 1535w"
+              sizes="100vw"
+              width={1535}
+              height={2048}
+              fetchPriority="high"
+              alt="Bílé IVECO Daily před žlutou historickou budovou"
+              className="hero-intro-photo"
+            />
             <div className="hero-intro-shade" aria-hidden="true" />
-            <Reveal className="hero-intro-content mx-auto max-w-6xl px-4 py-16 md:py-24">
-              <p className="text-sm font-semibold tracking-[0.18em] text-paper/75 uppercase">Jindřichův Hradec · celá ČR</p>
-              <h1 className="mt-4 max-w-2xl font-display text-5xl leading-[0.94] text-paper md:text-7xl">
+            <Reveal className="hero-intro-content mx-auto max-w-6xl px-6 py-16 md:px-10 md:py-28">
+              <p className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium text-paper">
+                <span className="size-2 rounded-full bg-accent shadow-[0_0_0_4px_rgb(208_18_26/0.3)]" aria-hidden="true" />
+                Jindřichův Hradec · celá ČR
+              </p>
+              <h1 className="mt-4 max-w-3xl font-display text-5xl leading-[0.98] font-bold text-balance text-paper md:text-7xl lg:text-8xl">
                 S námi je vše lehké.
-                <span className="mt-2 block text-accent">Od roku {COMPANY.since}.</span>
+                <span className="mt-2 block bg-gradient-to-r from-[#ff5a5f] to-accent bg-clip-text text-transparent">Od roku {COMPANY.since}.</span>
               </h1>
-              <p className="mt-7 max-w-xl text-lg text-paper/85">
+              <p className="mt-7 max-w-xl text-lg text-paper/80 md:text-xl">
                 Byty, firmy, zámky i těžké kusy. Přímá domluva, pojištěná přeprava, celá ČR.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <a href="#kalkulacka" className={buttonVariants({ variant: "primary" })}>Spočítat cenu</a>
-                <a href={`tel:${phone.tel}`} className={buttonVariants({ variant: "line" })}><Phone className="size-4" /> {phone.label}</a>
+                <a href={`tel:${phone.tel}`} className={buttonVariants({ variant: "glass" })}><Phone className="size-4" /> {phone.label}</a>
               </div>
-              <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-paper/80">
-                <span>✓ Pojištěná přeprava</span><span>✓ Víkendy bez příplatku</span><span>✓ Vůz 18,73 m³</span>
+              <div className="mt-8 flex flex-wrap gap-2 text-sm font-medium text-paper">
+                {["Pojištěná přeprava", "Víkendy bez příplatku", "Vůz 18,73 m³"].map((t) => (
+                  <span key={t} className="glass rounded-full px-3.5 py-1.5">
+                    ✓ {t}
+                  </span>
+                ))}
               </div>
             </Reveal>
-            <p className="hero-intro-caption mx-auto max-w-6xl px-4 py-3 text-sm text-paper/65">IVECO Daily · SPZ 8C7 8206</p>
+            <p className="hero-intro-caption mx-auto max-w-6xl px-6 py-4 md:px-10 text-sm text-paper/65">IVECO Daily · SPZ 8C7 8206</p>
           </div>
-          <dl className="mx-auto grid max-w-6xl grid-cols-2 border-t border-line md:grid-cols-4">
+          <dl className="mx-auto mt-4 grid max-w-6xl grid-cols-2 gap-3 md:grid-cols-4">
             {[
               ["1987", "bez přestávky"],
               ["18,73 m³", "změřený náklad"],
@@ -189,28 +217,30 @@ export function HomePage() {
               <Reveal
                 key={label}
                 delay={index * 70}
-                className={cn("border-line px-4 py-4", index % 2 === 1 && "border-l", index > 0 && "md:border-l")}
+                className="card px-5 py-5"
               >
-                <dt className="font-display text-2xl">{value}</dt>
-                <dd className="text-sm text-muted">{label}</dd>
+                <dt className="font-display text-3xl font-bold">{value}</dt>
+                <dd className="mt-0.5 text-sm text-muted">{label}</dd>
               </Reveal>
             ))}
           </dl>
         </section>
 
-        <section id="sluzby" className="scroll-mt-24 px-4 py-16">
+        <section id="sluzby" className="scroll-mt-24 px-4 py-20 md:py-28">
           <div className="mx-auto max-w-6xl">
             <SectionTitle kicker="Co vozíme" title="Šest věcí, které umíme" />
-            <ol className="mt-10 border-t border-ink">
+            <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {SERVICES.map((service, index) => (
                 <Reveal
                   as="li"
                   key={service.title}
                   delay={index * 60}
-                  className="grid gap-2 border-b border-line py-5 transition-colors duration-200 hover:bg-sheet md:grid-cols-[4rem_14rem_1fr] md:gap-6"
+                  className="card flex flex-col gap-3 p-6"
                 >
-                  <span className="font-display text-2xl text-accent">{String(index + 1).padStart(2, "0")}</span>
-                  <h3 className="font-display text-2xl">{service.title}</h3>
+                  <span className="grid size-10 place-items-center rounded-full bg-accent/10 font-display text-base font-bold text-accent">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="font-display text-2xl font-bold">{service.title}</h3>
                   <p className="text-muted">
                     {service.text}
                     {service.note && <span className="mt-1 block text-accent-deep">{service.note}</span>}
@@ -221,7 +251,7 @@ export function HomePage() {
           </div>
         </section>
 
-        <section id="kalkulacka" className="scroll-mt-24 overflow-x-clip border-y border-line bg-sheet px-4 py-16">
+        <section id="kalkulacka" className="scroll-mt-24 overflow-x-clip border-y border-line bg-sheet px-4 py-20 md:py-28">
           <div className="mx-auto max-w-6xl">
             <SectionTitle
               kicker="Orientační ceník"
@@ -231,7 +261,7 @@ export function HomePage() {
             <Reveal className="mt-8" delay={80}>
               <Calculator />
             </Reveal>
-            <details className="mt-6 rounded-card border border-line bg-paper p-5">
+            <details className="card card-static mt-6 p-6">
               <summary className="cursor-pointer font-display text-xl">Jak se cena skládá</summary>
               <ul className="mt-4 space-y-2 text-sm text-muted">
                 <li>
@@ -261,16 +291,20 @@ export function HomePage() {
           </div>
         </section>
 
-        <section id="realizace" className="scroll-mt-24 px-4 py-16">
+        <section id="realizace" className="scroll-mt-24 px-4 py-20 md:py-28">
           <div className="mx-auto max-w-6xl">
             <SectionTitle kicker="Z akcí" title="Tři věci, které se opravdu stěhovaly" />
             <div className="mt-8 grid gap-8 md:grid-cols-[1.35fr_1fr_1fr]">
               {PHOTOS.map((item, index) => (
                 <Reveal as="figure" key={item.src} delay={index * 90}>
                   <button type="button" onClick={() => setPhoto(item)} className="group block w-full text-left">
-                    <span className="block overflow-hidden rounded-card border border-line">
+                    <span className="block overflow-hidden rounded-card border border-line shadow-soft transition-shadow duration-300 group-hover:shadow-lift">
                       <img
                         src={item.src}
+                        srcSet={item.srcSet}
+                        sizes="(min-width: 768px) 40vw, 100vw"
+                        loading="lazy"
+                        decoding="async"
                         alt={item.alt}
                         className={cn(
                           "w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105",
@@ -278,7 +312,7 @@ export function HomePage() {
                         )}
                       />
                     </span>
-                    <figcaption className="mt-3 border-t-2 border-accent pt-2 transition-colors group-hover:border-accent-deep">
+                    <figcaption className="mt-4 px-1">
                       <span className="block font-display text-xl transition-colors group-hover:text-accent-deep">
                         {item.title}
                       </span>
@@ -291,12 +325,12 @@ export function HomePage() {
           </div>
         </section>
 
-        <section className="border-y border-line bg-sheet px-4 py-14">
+        <section className="border-y border-line bg-sheet px-4 py-20">
           <div className="mx-auto max-w-6xl">
             <SectionTitle kicker="Proč Zeman" title="Zkušenosti, které jsou na zakázce znát" text="Nechceme si psát vymyšlené hvězdičky. Důvěru stavíme na konkrétní práci, přímé domluvě a věcech, které po nás zůstanou v pořádku." />
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               {TRUST_POINTS.map(([title, text], index) => (
-                <Reveal key={title} delay={index * 80} className="border-t-2 border-accent px-1 pt-4">
+                <Reveal key={title} delay={index * 80} className="card p-6">
                   <p className="font-display text-2xl">{title}</p>
                   <p className="mt-2 text-sm text-muted">{text}</p>
                 </Reveal>
@@ -305,9 +339,9 @@ export function HomePage() {
           </div>
         </section>
 
-        <section id="o-nas" className="scroll-mt-24 border-y border-line bg-sheet px-4 py-16">
+        <section id="o-nas" className="scroll-mt-24 px-4 py-20 md:py-28">
           <Reveal className="mx-auto grid max-w-6xl gap-10 md:grid-cols-[auto_1fr] md:items-start">
-            <p className="font-display text-8xl leading-none text-accent">{COMPANY.since}</p>
+            <p className="font-display text-8xl leading-none font-extrabold text-accent/90 md:text-9xl">{COMPANY.since}</p>
             <div>
               <h2 className="font-display text-4xl">Malá firma, dlouhá praxe</h2>
               <p className="mt-4 max-w-2xl text-muted">
@@ -334,14 +368,14 @@ export function HomePage() {
           </Reveal>
         </section>
 
-        <section id="kontakt" className="scroll-mt-24 px-4 py-16">
+        <section id="kontakt" className="scroll-mt-24 px-4 pb-20 md:pb-28">
           <Reveal className="mx-auto grid max-w-6xl gap-8 md:grid-cols-2">
             <div>
               <SectionTitle kicker="Sídlo" title="Kontakt" />
-              <div className="mt-7 rounded-card bg-ink p-5 text-paper shadow-sm">
+              <div className="mt-7 rounded-card bg-ink p-6 text-paper shadow-lift">
                 <p className="font-display text-2xl">Domluvme termín po telefonu</p>
                 <p className="mt-2 text-sm text-paper/75">Krátce popište, co stěhujete a odkud kam. Řekneme si, co bude potřeba a kdy můžeme přijet.</p>
-                <a href={`tel:${phone.tel}`} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-md bg-accent px-5 font-semibold text-paper transition-colors hover:bg-accent-deep">
+                <a href={`tel:${phone.tel}`} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-6 font-semibold text-paper transition-colors hover:bg-accent-deep">
                   <Phone className="size-4" /> {phone.label}
                 </a>
               </div>
@@ -388,7 +422,7 @@ export function HomePage() {
             </div>
             <iframe
               title="Mapa sídla, Claudiusova 413, Jindřichův Hradec"
-              className="h-96 w-full rounded-card border border-line"
+              className="h-96 w-full rounded-card border border-line shadow-soft md:h-full md:min-h-[28rem]"
               src={`https://www.openstreetmap.org/export/embed.html?bbox=${(COMPANY.depot.lon - 0.008).toFixed(3)}%2C${(COMPANY.depot.lat - 0.005).toFixed(3)}%2C${(COMPANY.depot.lon + 0.008).toFixed(3)}%2C${(COMPANY.depot.lat + 0.005).toFixed(3)}&layer=mapnik&marker=${COMPANY.depot.lat}%2C${COMPANY.depot.lon}`}
             />
           </Reveal>
@@ -407,7 +441,9 @@ export function HomePage() {
         </div>
       </footer>
 
-      <a href={`tel:${phone.tel}`} className="desktop-contact-cta hidden md:flex" aria-label={`Zavolat na číslo ${phone.label}`}>
+      <a href={`tel:${phone.tel}`} className={cn("desktop-contact-cta hidden transition-opacity duration-200 md:flex", inCalculator && "pointer-events-none opacity-0")}
+        tabIndex={inCalculator ? -1 : undefined}
+        aria-hidden={inCalculator || undefined} aria-label={`Zavolat na číslo ${phone.label}`}>
         <Phone className="size-4" />
         <span>
           <strong>Zavolat</strong>
@@ -415,20 +451,20 @@ export function HomePage() {
         </span>
       </a>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-ink p-2 text-paper md:hidden">
+      <div className="fixed inset-x-2 bottom-2 z-20 rounded-2xl border border-white/10 bg-ink/95 p-2 text-paper shadow-lift backdrop-blur-xl md:hidden">
         <div className="grid grid-cols-3 gap-2">
           <a
             href={`tel:${phone.tel}`}
-            className="flex min-h-11 items-center justify-center gap-1 bg-accent text-sm font-semibold text-paper"
+            className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-accent text-sm font-semibold text-paper"
           >
             <Phone className="size-4" /> Volat
           </a>
-          <a href="#kalkulacka" className="flex min-h-11 items-center justify-center gap-1 bg-paper text-sm font-semibold text-ink">
+          <a href="#kalkulacka" className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-paper text-sm font-semibold text-ink">
             Cena
           </a>
           <a
             href={`mailto:${COMPANY.email}`}
-            className="flex min-h-11 items-center justify-center gap-1 bg-ink-soft text-sm font-semibold"
+            className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-ink-soft text-sm font-semibold"
           >
             <Mail className="size-4" /> E-mail
           </a>
@@ -470,9 +506,8 @@ export function HomePage() {
 function SectionTitle({ kicker, title, text }: { kicker: string; title: string; text?: string }) {
   return (
     <Reveal className="max-w-2xl">
-      <p className="text-sm tracking-widest text-accent uppercase">{kicker}</p>
-      <span className="kicker-rule mt-2 block h-0.5 w-12 bg-accent" aria-hidden="true" />
-      <h2 className="mt-3 font-display text-4xl leading-tight">{title}</h2>
+      <p className="inline-flex rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold tracking-widest text-accent uppercase">{kicker}</p>
+      <h2 className="mt-4 font-display text-4xl leading-[1.05] font-bold text-balance md:text-5xl">{title}</h2>
       {text && <p className="mt-4 text-muted">{text}</p>}
     </Reveal>
   );

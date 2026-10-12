@@ -2,25 +2,33 @@
 @import "tw-animate-css";
 
 @theme {
-  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
-  --font-sans: "Source Sans 3", "Segoe UI", sans-serif;
+  --font-display: "Bricolage Grotesque", "Segoe UI", sans-serif;
+  --font-sans: "Inter", "Segoe UI", sans-serif;
 
   --color-ink: #14181d;
   --color-ink-soft: #1e252c;
-  --color-paper: #f4f8fb;
+  --color-paper: #f6f8fa;
   --color-sheet: #ffffff;
   --color-sky: #c5d9ea;
   --color-accent: #d0121a;
   --color-accent-deep: #9d0d13;
-  --color-line: #d5dee6;
+  --color-line: #e1e8ee;
   --color-muted: #4e5963;
 
-  --radius-card: 0.75rem;
+  --radius-card: 1.25rem;
+  --shadow-soft: 0 1px 2px rgb(20 24 29 / 0.04), 0 8px 24px -8px rgb(20 24 29 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(20 24 29 / 0.05), 0 20px 40px -16px rgb(20 24 29 / 0.22);
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
+  }
+  h1,
+  h2,
+  h3,
+  .font-display {
+    letter-spacing: -0.02em;
   }
   body {
     background: var(--color-paper);
@@ -64,25 +72,25 @@
   transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.hero-intro { position: relative; min-height: 34rem; overflow: hidden; background: var(--color-ink); }
+.hero-intro { position: relative; min-height: 36rem; overflow: hidden; border-radius: 1.75rem; background: var(--color-ink); box-shadow: var(--shadow-lift); }
 .hero-intro-photo, .hero-intro-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-intro-photo { object-fit: cover; object-position: center 58%; animation: hero-drift 18s ease-in-out infinite alternate; }
-.hero-intro-shade { background: linear-gradient(90deg, rgb(20 24 29 / 0.9) 0%, rgb(20 24 29 / 0.72) 42%, rgb(20 24 29 / 0.18) 100%); }
+.hero-intro-shade { background: linear-gradient(100deg, rgb(20 24 29 / 0.92) 0%, rgb(20 24 29 / 0.7) 45%, rgb(20 24 29 / 0.1) 100%); }
 .hero-intro-content { position: relative; z-index: 1; }
 .hero-intro-caption { position: absolute; right: 0; bottom: 0; left: 0; z-index: 1; }
 .calculator-stepbar { border-bottom: 1px solid var(--color-line); padding-bottom: 0.25rem; }
 .calculator-mobile-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-radius: var(--radius-card); padding: 0.8rem 1rem; background: var(--color-ink); color: var(--color-paper); box-shadow: 0 0.75rem 1.5rem rgb(20 24 29 / 0.12); }
 .calculator-mobile-summary-link { display: inline-flex; min-height: 2.75rem; align-items: center; border: 1px solid rgb(244 248 251 / 0.35); border-radius: 0.375rem; padding: 0 0.85rem; color: var(--color-paper); font-size: 0.875rem; font-weight: 600; transition: background-color 180ms ease, border-color 180ms ease; }
 .calculator-mobile-summary-link:hover, .calculator-mobile-summary-link:focus-visible { border-color: var(--color-paper); background: var(--color-ink-soft); }
-.calculator-step { display: flex; align-items: center; gap: 0.75rem; min-height: 3.5rem; border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 0.65rem 0.8rem; background: var(--color-paper); color: var(--color-muted); }
+.calculator-step { display: flex; align-items: center; gap: 0.75rem; min-height: 3.5rem; border: 1px solid var(--color-line); border-radius: 1rem; padding: 0.65rem 0.8rem; background: var(--color-paper); color: var(--color-muted); }
 .calculator-step-active { border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 5%, var(--color-paper)); color: var(--color-ink); }
 .calculator-step-number { display: grid; flex: 0 0 auto; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 999px; background: var(--color-line); color: var(--color-ink); font-family: var(--font-display); font-size: 1.1rem; }
 .calculator-step-active .calculator-step-number { background: var(--color-accent); color: var(--color-paper); }
 .calculator-step strong, .calculator-step small { display: block; }
-.calculator-step strong { font-family: var(--font-display); font-size: 1.15rem; line-height: 1.1; text-transform: uppercase; }
+.calculator-step strong { font-family: var(--font-display); font-size: 1.15rem; line-height: 1.1; text-transform: none; }
 .calculator-step small { margin-top: 0.15rem; font-size: 0.8rem; }
 .calculator-total { margin-top: 0.75rem; padding-top: 0.75rem; }
-.desktop-contact-cta { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 20; align-items: center; gap: 0.65rem; min-height: 3.5rem; border-radius: 0.5rem; padding: 0.65rem 1rem; background: var(--color-accent); color: var(--color-paper); box-shadow: 0 0.75rem 1.5rem rgb(20 24 29 / 0.2); transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease; }
+.desktop-contact-cta { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 20; align-items: center; gap: 0.65rem; min-height: 3.5rem; border-radius: 999px; padding: 0.65rem 1.25rem 0.65rem 1rem; background: var(--color-accent); color: var(--color-paper); box-shadow: 0 0.75rem 1.5rem rgb(20 24 29 / 0.2); transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease; }
 .desktop-contact-cta:hover, .desktop-contact-cta:focus-visible { background: var(--color-accent-deep); box-shadow: 0 1rem 2rem rgb(20 24 29 / 0.26); transform: translateY(-2px); }
 .desktop-contact-cta strong, .desktop-contact-cta small { display: block; line-height: 1.2; }
 .desktop-contact-cta small { margin-top: 0.15rem; font-size: 0.75rem; opacity: 0.82; }
@@ -163,3 +171,12 @@
   .hero-intro { min-height: 38rem; }
   .hero-intro-shade { background: linear-gradient(180deg, rgb(20 24 29 / 0.72) 0%, rgb(20 24 29 / 0.88) 72%, rgb(20 24 29 / 0.96) 100%); }
 }
+
+/* --- modern layer --- */
+.glass { background: rgb(255 255 255 / 0.1); border: 1px solid rgb(255 255 255 / 0.18); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
+.card { border: 1px solid var(--color-line); border-radius: var(--radius-card); background: var(--color-sheet); box-shadow: var(--shadow-soft); transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s; }
+.card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lift); border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-line)); }
+.card-static:hover { transform: none; }
+.calculator-step-done .calculator-step-number { background: var(--color-ink); color: var(--color-paper); }
+.calculator-step { transition: border-color 0.2s, background-color 0.2s; }
+a.calculator-step:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line)); }
