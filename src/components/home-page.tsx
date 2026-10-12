@@ -64,6 +64,12 @@ const PHOTOS = [
   },
 ];
 
+const TRUST_POINTS = [
+  ["Přímá domluva", "Bez call centra. Termín, přístup i cenu řešíte rovnou s člověkem, který zakázku zná."],
+  ["Citlivé věci", "Zámky, obrazy, nástroje i zdravotnická technika. Věci chráníme, jako by byly naše."],
+  ["Dlouhá praxe", "Od roku 1987 stěhujeme byty, firmy i těžké kusy po celé republice i za hranice."],
+] as const;
+
 export function HomePage() {
   const [open, setOpen] = useState(false);
   const [photo, setPhoto] = useState<(typeof PHOTOS)[number] | null>(null);
@@ -151,27 +157,29 @@ export function HomePage() {
 
       <main id="obsah">
         <section className="border-b border-line">
-          <Reveal className="mx-auto max-w-6xl px-4 py-10 md:py-14">
-            <h1>
-              <img
-                src="/logo.png"
-                alt="Stěhování, nákladní doprava, V. Zeman, Jindřichův Hradec. S námi je vše lehké."
-                className="h-auto w-full max-w-xl"
-              />
-            </h1>
-            <p className="mt-8 max-w-xl text-lg text-muted">
-              Malá firma, žádné call centrum. Byty, kanceláře, zámky a věci, se kterými se nespěchá. Vůz IVECO Daily
-              do 3,5 t, od roku {COMPANY.since}, majetek na cestě pojištěný u České pojišťovny.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <a href="#kalkulacka" className={buttonVariants({ variant: "primary" })}>
-                Spočítat cenu
-              </a>
-              <a href={`tel:${phone.tel}`} className={buttonVariants({ variant: "line" })}>
-                <Phone className="size-4" /> {phone.label}
-              </a>
-            </div>
-          </Reveal>
+          <div className="hero-intro">
+            <img src="/photos/vuz.jpg" alt="Bílé IVECO Daily před žlutou historickou budovou" className="hero-intro-photo" />
+            <div className="hero-intro-shade" aria-hidden="true" />
+            <Reveal className="hero-intro-content mx-auto max-w-6xl px-4 py-16 md:py-24">
+              <p className="text-sm font-semibold tracking-[0.18em] text-paper/75 uppercase">Jindřichův Hradec · celá ČR</p>
+              <h1 className="mt-4 max-w-2xl font-display text-5xl leading-[0.94] text-paper md:text-7xl">
+                Stěhování bez call centra.
+                <span className="mt-2 block text-accent">Od roku {COMPANY.since}.</span>
+              </h1>
+              <p className="mt-7 max-w-xl text-lg text-paper/85">
+                Malá firma, přímé jednání a ohleduplné zacházení s věcmi, které nejsou naše. Byty, kanceláře, zámky i
+                těžké kusy — s pojištěnou přepravou.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <a href="#kalkulacka" className={buttonVariants({ variant: "primary" })}>Spočítat cenu</a>
+                <a href={`tel:${phone.tel}`} className={buttonVariants({ variant: "line" })}><Phone className="size-4" /> {phone.label}</a>
+              </div>
+              <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-paper/80">
+                <span>✓ Pojištěná přeprava</span><span>✓ Víkendy bez příplatku</span><span>✓ Vůz 18,73 m³</span>
+              </div>
+            </Reveal>
+            <p className="hero-intro-caption mx-auto max-w-6xl px-4 py-3 text-sm text-paper/65">IVECO Daily · SPZ 8C7 8206</p>
+          </div>
           <dl className="mx-auto grid max-w-6xl grid-cols-2 border-t border-line md:grid-cols-4">
             {[
               ["1987", "bez přestávky"],
@@ -190,20 +198,6 @@ export function HomePage() {
             ))}
           </dl>
         </section>
-
-        <Reveal as="figure" className="border-b border-line">
-          <div className="hero-frame">
-            <img
-              src="/photos/vuz.jpg"
-              alt="Bílé IVECO Daily před žlutou historickou budovou"
-              className="hero-photo"
-            />
-          </div>
-          <figcaption className="mx-auto flex max-w-6xl items-baseline justify-between gap-4 px-4 py-3 text-sm text-muted">
-            <span>Výjezd. IVECO Daily, SPZ 8C7 8206.</span>
-            <span className="font-display text-2xl tracking-wide text-accent uppercase">S námi je vše lehké</span>
-          </figcaption>
-        </Reveal>
 
         <section id="sluzby" className="scroll-mt-24 px-4 py-16">
           <div className="mx-auto max-w-6xl">
@@ -271,7 +265,7 @@ export function HomePage() {
         <section id="realizace" className="scroll-mt-24 px-4 py-16">
           <div className="mx-auto max-w-6xl">
             <SectionTitle kicker="Z akcí" title="Tři věci, které se opravdu stěhovaly" />
-            <div className="mt-8 grid gap-8 md:grid-cols-3">
+            <div className="mt-8 grid gap-8 md:grid-cols-[1.35fr_1fr_1fr]">
               {PHOTOS.map((item, index) => (
                 <Reveal as="figure" key={item.src} delay={index * 90}>
                   <button type="button" onClick={() => setPhoto(item)} className="group block w-full text-left">
@@ -279,7 +273,10 @@ export function HomePage() {
                       <img
                         src={item.src}
                         alt={item.alt}
-                        className="h-64 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                        className={cn(
+                          "w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105",
+                          index === 0 ? "h-80" : "h-64",
+                        )}
                       />
                     </span>
                     <figcaption className="mt-3 border-t-2 border-accent pt-2 transition-colors group-hover:border-accent-deep">
@@ -289,6 +286,20 @@ export function HomePage() {
                       <span className="text-sm text-muted">{item.text}</span>
                     </figcaption>
                   </button>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-y border-line bg-sheet px-4 py-14">
+          <div className="mx-auto max-w-6xl">
+            <SectionTitle kicker="Proč Zeman" title="Zkušenosti, které jsou na zakázce znát" text="Nechceme si psát vymyšlené hvězdičky. Důvěru stavíme na konkrétní práci, přímé domluvě a věcech, které po nás zůstanou v pořádku." />
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              {TRUST_POINTS.map(([title, text], index) => (
+                <Reveal key={title} delay={index * 80} className="border-t-2 border-accent px-1 pt-4">
+                  <p className="font-display text-2xl">{title}</p>
+                  <p className="mt-2 text-sm text-muted">{text}</p>
                 </Reveal>
               ))}
             </div>
@@ -328,6 +339,13 @@ export function HomePage() {
           <Reveal className="mx-auto grid max-w-6xl gap-8 md:grid-cols-2">
             <div>
               <SectionTitle kicker="Sídlo" title="Kontakt" />
+              <div className="mt-7 rounded-card bg-ink p-5 text-paper shadow-sm">
+                <p className="font-display text-2xl">Domluvme termín po telefonu</p>
+                <p className="mt-2 text-sm text-paper/75">Krátce popište, co stěhujete a odkud kam. Řekneme si, co bude potřeba a kdy můžeme přijet.</p>
+                <a href={`tel:${phone.tel}`} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-md bg-accent px-5 font-semibold text-paper transition-colors hover:bg-accent-deep">
+                  <Phone className="size-4" /> {phone.label}
+                </a>
+              </div>
               <ul className="mt-8 space-y-5">
                 <li className="flex gap-3">
                   <Phone className="mt-1 size-5 text-accent" />

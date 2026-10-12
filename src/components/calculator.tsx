@@ -422,11 +422,23 @@ export function Calculator() {
     saved.extras.reduce((sum, item) => sum + item.qty, 0);
 
   return (
-    <div className="grid w-full min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+    <div className="w-full min-w-0">
+      <div className="calculator-mobile-summary mb-4 lg:hidden" aria-live="polite">
+        <div>
+          <span className="block text-xs font-semibold tracking-widest text-paper/65 uppercase">Průběžný odhad</span>
+          <strong className="mt-1 block font-display text-2xl text-paper">{formatKc(quote.gross)} s DPH</strong>
+        </div>
+        <a href="#souhrn" className="calculator-mobile-summary-link">Detail ceny</a>
+      </div>
+      <div className="calculator-stepbar mb-4 grid gap-2 sm:grid-cols-2" aria-label="Postup kalkulace">
+        <div className="calculator-step calculator-step-active"><span className="calculator-step-number">1</span><span><strong>Co stěhujete?</strong><small>Přidejte věci do nákladového listu.</small></span></div>
+        <div className="calculator-step"><span className="calculator-step-number">2</span><span><strong>Trasa a poptávka</strong><small>Doplňte adresu a získejte orientační cenu.</small></span></div>
+      </div>
+      <div className="grid w-full min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="min-w-0 overflow-hidden rounded-card border border-line bg-sheet shadow-sm">
         <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="font-display text-sm uppercase tracking-widest text-accent">Kusy</p>
+            <p className="font-display text-sm uppercase tracking-widest text-accent">1 · Kusy</p>
             <p className="text-sm text-muted">Klepnutím přidáte kus. Cenu uvidíte až v součtu.</p>
           </div>
           <label className="relative block min-w-0 sm:w-64">
@@ -616,7 +628,7 @@ export function Calculator() {
       <aside id="souhrn" className="scroll-mt-24 overflow-hidden rounded-card bg-ink text-paper shadow-sm lg:sticky lg:top-20">
         <div className="p-5">
         <div className="flex items-baseline justify-between gap-3">
-          <h3 className="font-display text-2xl uppercase tracking-wide">Nákladový list</h3>
+          <h3 className="font-display text-2xl uppercase tracking-wide">2 · Trasa a cena</h3>
           <span className="text-sm text-paper/70">{pieceCount} ks</span>
         </div>
         <div className="mt-4">
@@ -754,7 +766,7 @@ export function Calculator() {
           <Row label="Patra" value={quote.floors} />
           <Row label="Odpojení pračky a myčky" value={quote.handling} />
           <Row label={`Dopravné ${formatKm(quote.distanceKm)}`} value={quote.transport} />
-          <div className="flex items-end justify-between gap-3 border-t border-accent pt-3">
+          <div className="calculator-total flex items-end justify-between gap-3 border-t border-accent pt-3">
             <dt className="font-display text-lg uppercase">Bez DPH</dt>
             <dd className="font-display text-2xl text-accent">{formatKc(quote.net)}</dd>
           </div>
@@ -882,6 +894,7 @@ export function Calculator() {
         </div>
         </div>
       </aside>
+      </div>
     </div>
   );
 }
