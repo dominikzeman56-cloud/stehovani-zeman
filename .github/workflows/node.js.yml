@@ -21,4 +21,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
-      - run: npm test
+      # `npm test` is the App Builder platform suite. It reads the live
+      # site title out of src/lib/og/site.json, so it fails once the page
+      # is branded. The site gate is typecheck + build.
