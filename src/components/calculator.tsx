@@ -3,6 +3,7 @@ import { Check, Copy, ImagePlus, Loader2, Minus, Plus, Route, Search, Trash2, X 
 import { CATEGORIES, COMPANY, ESTIMATE_CAVEAT, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
 import { computeQuote, formatKc, formatKm, formatVolume, readManualKm, type Cart, type ExtraItem, type RouteLegs } from "@/lib/quote";
 import { Button } from "@/components/ui/button";
+import { AddressInput, type Point } from "@/components/address-input";
 import { cn } from "@/lib/cn";
 
 const STORAGE_KEY = "zeman-kalkulacka-v1";
@@ -54,8 +55,6 @@ const EMPTY: Saved = {
   packing: false,
   extras: [],
 };
-
-type Point = { lat: number; lon: number };
 
 async function geocode(query: string): Promise<Point | null> {
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=1`;
@@ -201,6 +200,8 @@ export function Calculator() {
   const [draftVol, setDraftVol] = useState("");
   const [draftWeight, setDraftWeight] = useState("");
   const [draftClass, setDraftClass] = useState<WeightClass>("medium");
+  const [fromPoint, setFromPoint] = useState<Point | null>(null);
+  const [toPoint, setToPoint] = useState<Point | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const photosRef = useRef(photos);
   photosRef.current = photos;
@@ -226,7 +227,11 @@ export function Calculator() {
 
   useEffect(() => {
     if (!ready) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    } catch {
+      /* soukromý režim nebo plná kvóta, kalkulačka běží dál bez uložení */
+    }
   }, [saved, ready]);
 
   useEffect(() => {
@@ -261,6 +266,8 @@ export function Calculator() {
 
   function patch(partial: Partial<Saved>) {
     setSaved((current) => ({ ...current, ...partial }));
+    // Změna adresy zneplatní spočítanou trasu, jinak cena zůstane ze starých adres.
+    if ("from" in partial || "to" in partial) setLegs(null);
   }
 
   function setQty(id: string, next: number) {
@@ -318,8 +325,10 @@ export function Calculator() {
     }
     setRouting(true);
     try {
-      const start = await geocode(`${from}, Česko`);
-      const end = await geocode(`${to}, Česko`);
+      const [start, end] = await Promise.all([
+        fromPoint ?? geocode(`${from}, Česko`),
+        toPoint ?? geocode(`${to}, Česko`),
+      ]);
       if (!start || !end) {
         setRouteError("Adresu se nepodařilo najít. Kilometry můžete zadat ručně.");
         return;
@@ -373,10 +382,16 @@ export function Calculator() {
     setSaved(EMPTY);
     clearPhotos();
     setLegs(null);
+    setFromPoint(null);
+    setToPoint(null);
     setRouteError("");
     setQuery("");
     setNotice("Kalkulačka je prázdná.");
-    localStorage.removeItem(STORAGE_KEY);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* nevadí */
+    }
   }
 
   async function send() {
@@ -384,6 +399,11 @@ export function Calculator() {
     if (!saved.name.trim() || !saved.phone.trim()) {
       setNotice("Doplňte jméno a telefon, ať se vám ozveme.");
       document.getElementById("poptavka-jmeno")?.focus();
+      return;
+    }
+    if (saved.phone.replace(/\D/g, "").length < 9) {
+      setNotice("Telefon vypadá krátký. Napište ho celý, ať vám můžeme zavolat.");
+      document.getElementById("poptavka-telefon")?.focus();
       return;
     }
     const files = photos.map((photo) => photo.file);
@@ -421,6 +441,17 @@ export function Calculator() {
     Object.values(saved.cart).reduce((sum, qty) => sum + qty, 0) +
     saved.extras.reduce((sum, item) => sum + item.qty, 0);
 
+  const hasRoute = quote.distanceKm > 0 || saved.useManual;
+  const stepDone = [pieceCount > 0, hasRoute, Boolean(saved.name.trim() && saved.phone.trim())];
+  const activeStep = stepDone.findIndex((done) => !done);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const steps = [
+    { id: "kalk-krok-1", title: "Co stěhujete", hint: "Přidejte věci do nákladového listu." },
+    { id: "kalk-krok-2", title: "Patra a trasa", hint: "Doplňte adresy, získáte orientační cenu." },
+    { id: "kalk-krok-3", title: "Poptávka", hint: "Kontakt, termín a poznámka k přístupu." },
+  ];
+
   return (
     <div className="w-full min-w-0">
       <div className="calculator-mobile-summary mb-4 lg:hidden" aria-live="polite">
@@ -430,471 +461,564 @@ export function Calculator() {
         </div>
         <a href="#souhrn" className="calculator-mobile-summary-link">Detail ceny</a>
       </div>
-      <div className="calculator-stepbar mb-4 grid gap-2 sm:grid-cols-2" aria-label="Postup kalkulace">
-        <div className="calculator-step calculator-step-active"><span className="calculator-step-number">1</span><span><strong>Co stěhujete?</strong><small>Přidejte věci do nákladového listu.</small></span></div>
-        <div className="calculator-step"><span className="calculator-step-number">2</span><span><strong>Trasa a poptávka</strong><small>Doplňte adresu a získejte orientační cenu.</small></span></div>
-      </div>
-      <div className="grid w-full min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
-      <div className="min-w-0 overflow-hidden rounded-card border border-line bg-sheet shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="font-display text-sm uppercase tracking-widest text-accent">1 · Kusy</p>
-            <p className="text-sm text-muted">Klepnutím přidáte kus. Cenu uvidíte až v součtu.</p>
-          </div>
-          <label className="relative block min-w-0 sm:w-64">
-            <span className="sr-only">Hledat položku</span>
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Hledat, třeba klavír"
-              className="min-h-11 w-full rounded-md border border-line bg-paper pr-3 pl-10 text-ink"
-            />
-          </label>
-        </div>
 
-        {!query.trim() && (
-          <div className="flex gap-1 overflow-x-auto px-3 pt-3" role="tablist" aria-label="Kategorie">
-            {CATEGORIES.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                role="tab"
-                aria-selected={cat === category.id}
-                onClick={() => setCat(category.id)}
-                className={cn(
-                  "shrink-0 border-b-2 px-3 py-2 font-display text-sm uppercase tracking-wide",
-                  cat === category.id ? "border-accent text-accent" : "border-transparent text-muted",
-                )}
-              >
-                {category.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <ul className="grid gap-2 p-3 sm:grid-cols-2">
-          {visible.length === 0 && (
-            <li className="px-2 py-8 text-center text-sm text-muted sm:col-span-2">
-              V seznamu to není. Přidejte to dole jako další položku.
-            </li>
-          )}
-          {visible.map((item) => {
-            const qty = saved.cart[item.id] ?? 0;
-            return (
-              <li key={item.id}>
-                <div
-                  className={cn(
-                    "flex min-h-20 items-center gap-3 rounded-lg border px-3 py-2",
-                    qty > 0 ? "border-accent bg-accent/5" : "border-line bg-paper",
-                  )}
-                >
-                  <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setQty(item.id, qty + 1)}>
-                    <span className="block font-semibold">{item.name}</span>
-                    <span className="block text-xs text-muted">
-                      {formatVolume(item.vol)} · {item.weight} kg · {WEIGHT_LABEL[item.wCat]}
-                      {item.bulky ? " · po schodech jako velmi těžké" : ""}
-                    </span>
-                  </button>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      aria-label={`Odebrat ${item.name}`}
-                      onClick={() => setQty(item.id, qty - 1)}
-                      className="flex size-11 items-center justify-center rounded-md bg-line text-ink"
-                    >
-                      <Minus className="size-4" />
-                    </button>
-                    <span className="w-6 text-center font-display text-lg">{qty}</span>
-                    <button
-                      type="button"
-                      aria-label={`Přidat ${item.name}`}
-                      onClick={() => setQty(item.id, qty + 1)}
-                      className="flex size-11 items-center justify-center rounded-md bg-accent text-paper"
-                    >
-                      <Plus className="size-4" />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-
-        <form
-          className="border-t border-line p-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            addExtra();
-          }}
-        >
-          <p className="font-display text-sm uppercase tracking-widest text-accent">Další položka</p>
-          <p className="text-sm text-muted">
-            Co v seznamu není. Objem se počítá do kapacity vozu, cenu kusu domluvíme.
-          </p>
-          {saved.extras.length > 0 && (
-            <ul className="mt-3 grid gap-2">
-              {saved.extras.map((item) => (
-                <li key={item.id} className="flex min-h-16 items-center gap-3 border border-accent bg-accent/5 px-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <span className="block font-semibold">{item.name}</span>
-                    <span className="block text-xs text-muted">
-                      {formatVolume(item.vol)} · {item.weight} kg · {WEIGHT_LABEL[item.wCat]}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      aria-label={`Odebrat ${item.name}`}
-                      onClick={() => setExtraQty(item.id, item.qty - 1)}
-                      className="flex size-11 items-center justify-center rounded-md bg-line text-ink"
-                    >
-                      <Minus className="size-4" />
-                    </button>
-                    <span className="w-6 text-center font-display text-lg">{item.qty}</span>
-                    <button
-                      type="button"
-                      aria-label={`Přidat ${item.name}`}
-                      onClick={() => setExtraQty(item.id, item.qty + 1)}
-                      className="flex size-11 items-center justify-center rounded-md bg-accent text-paper"
-                    >
-                      <Plus className="size-4" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <label className="block text-sm sm:col-span-2">
-              Název
-              <input
-                value={draftName}
-                onChange={(event) => setDraftName(event.target.value)}
-                placeholder="Třeba piano křídlo, trezor, akvárium"
-                className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-3 text-ink"
-              />
-            </label>
-            <label className="block text-sm">
-              Počet
-              <input
-                inputMode="numeric"
-                value={draftQty}
-                onChange={(event) => setDraftQty(event.target.value)}
-                className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-3 text-ink"
-              />
-            </label>
-            <label className="block text-sm">
-              Jak těžké
-              <select
-                value={draftClass}
-                onChange={(event) => setDraftClass(event.target.value as WeightClass)}
-                className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-2 text-ink"
-              >
-                {(Object.keys(WEIGHT_LABEL) as WeightClass[]).map((key) => (
-                  <option key={key} value={key}>
-                    {WEIGHT_LABEL[key]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
-              Objem m³
-              <input
-                inputMode="decimal"
-                value={draftVol}
-                onChange={(event) => setDraftVol(event.target.value)}
-                placeholder="např. 1,5"
-                className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-3 text-ink"
-              />
-            </label>
-            <label className="block text-sm">
-              Hmotnost kg
-              <input
-                inputMode="decimal"
-                value={draftWeight}
-                onChange={(event) => setDraftWeight(event.target.value)}
-                placeholder="např. 80"
-                className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-3 text-ink"
-              />
-            </label>
-          </div>
-          <Button type="submit" className="mt-3">
-            <Plus className="size-4" /> Přidat položku
-          </Button>
-        </form>
-      </div>
-
-      <aside id="souhrn" className="scroll-mt-24 overflow-hidden rounded-card bg-ink text-paper shadow-sm lg:sticky lg:top-20">
-        <div className="p-5">
-        <div className="flex items-baseline justify-between gap-3">
-          <h3 className="font-display text-2xl uppercase tracking-wide">2 · Trasa a cena</h3>
-          <span className="text-sm text-paper/70">{pieceCount} ks</span>
-        </div>
-        <div className="mt-4">
-          <div className="mb-2 flex items-end justify-between gap-3">
-            <p className="font-display text-4xl leading-none">{formatVolume(quote.volume)}</p>
-            <p className="text-xs uppercase tracking-widest text-paper/60">
-              z {MAX_VOLUME_M3.toLocaleString("cs-CZ")} m³
-            </p>
-          </div>
-          <div
-            className="relative h-3 overflow-hidden rounded-full bg-ink-soft"
-            role="meter"
-            aria-label="Zaplnění aktuální jízdy"
-            aria-valuemin={0}
-            aria-valuemax={MAX_VOLUME_M3}
-            aria-valuenow={Math.round(rideFill(quote.volume) * MAX_VOLUME_M3)}
+      <nav className="mb-6 grid gap-2 sm:grid-cols-3" aria-label="Postup kalkulace">
+        {steps.map((step, index) => (
+          <a
+            key={step.id}
+            href={`#${step.id}`}
+            aria-current={index === activeStep ? "step" : undefined}
+            className={cn(
+              "calculator-step",
+              index === activeStep && "calculator-step-active",
+              stepDone[index] && "calculator-step-done",
+            )}
           >
-            <div className="load-fill h-full rounded-full bg-accent" style={{ width: `${rideFill(quote.volume) * 100}%` }} />
-            <span
-              className="absolute inset-y-0 z-10 w-0.5 bg-sky"
-              style={{ left: `${(FLAT_31_M3 / MAX_VOLUME_M3) * 100}%` }}
-              title="Byt 3+1"
-            />
-          </div>
-          <p className="mt-2 text-sm text-paper/80">{loadNote(quote.volume, quote.trips)}</p>
-          <p className="text-sm text-paper/70">
-            Hmotnost {quote.weight.toLocaleString("cs-CZ")} kg
-            {quote.overweight
-              ? ` — nad orientačních ${PAYLOAD_KG.toLocaleString("cs-CZ")} kg na jízdu. Cenu potvrdíme, může být potřeba další jízda.`
-              : ""}
-          </p>
-        </div>
+            <span className="calculator-step-number">{stepDone[index] ? <Check className="size-4" /> : index + 1}</span>
+            <span>
+              <strong>{step.title}</strong>
+              <small>{step.hint}</small>
+            </span>
+          </a>
+        ))}
+      </nav>
 
-        <ul className="mt-4 max-h-40 space-y-1 overflow-y-auto text-sm">
-          {quote.lines.length === 0 && <li className="text-paper/60">Přidejte první kus vlevo.</li>}
-          {quote.lines.map((line) => (
-            <li key={line.id} className="border-b border-paper/10 py-1 text-paper/85">
-              {line.name} <span className="text-sky">×{line.qty}</span>
-            </li>
-          ))}
-        </ul>
-
-        <fieldset className="mt-4 grid grid-cols-2 gap-3">
-          <legend className="sr-only">Patra a výtah</legend>
-          <FloorFields
-            title="Odkud"
-            floors={saved.floorsFrom}
-            lift={saved.liftFrom}
-            onFloors={(floorsFrom) => patch({ floorsFrom })}
-            onLift={(liftFrom) => patch({ liftFrom })}
-          />
-          <FloorFields
-            title="Kam"
-            floors={saved.floorsTo}
-            lift={saved.liftTo}
-            onFloors={(floorsTo) => patch({ floorsTo })}
-            onLift={(liftTo) => patch({ liftTo })}
-          />
-        </fieldset>
-
-        <div className="mt-4 border-t border-paper/15 pt-4">
-          <h4 className="flex items-center gap-2 font-display uppercase tracking-wide">
-            <Route className="size-4 text-accent" /> Trasa
-          </h4>
-          <label className="mt-3 block text-xs uppercase tracking-widest text-paper/60">
-            Odkud
-            <input
-              value={saved.from}
-              onChange={(event) => patch({ from: event.target.value })}
-              placeholder="Ulice, město"
-              className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink normal-case"
-            />
-          </label>
-          <label className="mt-2 block text-xs uppercase tracking-widest text-paper/60">
-            Kam
-            <input
-              value={saved.to}
-              onChange={(event) => patch({ to: event.target.value })}
-              placeholder="Ulice, město"
-              className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink normal-case"
-            />
-          </label>
-          <div className="mt-3 flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={saved.includeApproach}
-                onChange={(event) => patch({ includeApproach: event.target.checked })}
-              />
-              Nájezd ze sídla
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={saved.includeReturn}
-                onChange={(event) => patch({ includeReturn: event.target.checked })}
-              />
-              Návrat
-            </label>
-          </div>
-          <Button type="button" variant="line" className="mt-3 w-full" onClick={calculateRoute} disabled={routing}>
-            {routing ? <Loader2 className="size-4 animate-spin" /> : <Route className="size-4" />}
-            Spočítat kilometry
-          </Button>
-          {routeError && <p className="mt-2 text-sm text-accent">{routeError}</p>}
-          {legs && !saved.useManual && (
-            <p className="mt-2 text-sm text-paper/80">
-              Nájezd {formatKm(legs.approachKm)}, stěhování {formatKm(legs.moveKm)}, návrat {formatKm(legs.returnKm)}.
-              {saved.from && saved.to && (
-                <>
-                  {" "}
-                  <a className="underline" href={mapsUrl(saved.from, saved.to)} target="_blank" rel="noreferrer">
-                    Mapa
-                  </a>
-                </>
-              )}
-            </p>
-          )}
-          <label className="mt-3 block text-xs uppercase tracking-widest text-paper/60">
-            Kilometry ručně
-            <input
-              inputMode="decimal"
-              value={saved.manual}
-              onChange={(event) => patch({ manual: event.target.value, useManual: event.target.value.trim() !== "" })}
-              placeholder="např. 85"
-              className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink normal-case"
-            />
-          </label>
-          <p className="mt-1 text-xs text-paper/50">Ruční km přepíšou mapu. Sazba je {PRICE_PER_KM} Kč/km bez DPH.</p>
-        </div>
-
-        <dl className="mt-4 space-y-1 border-t border-paper/15 pt-4 text-sm">
-          <Row label={quote.trips > 1 ? `Základní jízda ×${quote.trips}` : "Základní jízda"} value={quote.tripFee} />
-          <Row label="Nakládka a složení" value={quote.items} />
-          <Row label="Patra" value={quote.floors} />
-          <Row label="Odpojení pračky a myčky" value={quote.handling} />
-          <Row label={`Dopravné ${formatKm(quote.distanceKm)}`} value={quote.transport} />
-          <div className="calculator-total flex items-end justify-between gap-3 border-t border-accent pt-3">
-            <dt className="font-display text-lg uppercase">Bez DPH</dt>
-            <dd className="font-display text-2xl text-accent">{formatKc(quote.net)}</dd>
-          </div>
-          <div className="flex justify-between text-paper/70">
-            <dt>DPH 21 %</dt>
-            <dd>{formatKc(quote.vat)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>S DPH</dt>
-            <dd className="font-semibold">{formatKc(quote.gross)}</dd>
-          </div>
-        </dl>
-        <p className="mt-3 text-sm leading-relaxed text-paper/75">{ESTIMATE_CAVEAT}</p>
-
-        <div id="poptavka" className="mt-4 scroll-mt-24 border-t border-paper/15 pt-4">
-          <h4 className="font-display uppercase tracking-wide">Poptávka</h4>
-          <div className="mt-3 grid gap-2">
-            <input
-              id="poptavka-jmeno"
-              value={saved.name}
-              onChange={(event) => patch({ name: event.target.value })}
-              placeholder="Jméno a příjmení"
-              className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm text-ink"
-            />
-            <input
-              value={saved.phone}
-              onChange={(event) => patch({ phone: event.target.value })}
-              placeholder="Telefon"
-              inputMode="tel"
-              className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm text-ink"
-            />
-            <input
-              value={saved.email}
-              onChange={(event) => patch({ email: event.target.value })}
-              placeholder="E-mail (nepovinné)"
-              inputMode="email"
-              className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm text-ink"
-            />
-            <input
-              type="date"
-              value={saved.date}
-              onChange={(event) => patch({ date: event.target.value })}
-              aria-label="Termín"
-              className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm text-ink"
-            />
-            <label className="block text-sm text-paper/80">
-              Přístup a co kalkulačka nevidí
-              <textarea
-                value={saved.note}
-                onChange={(event) => patch({ note: event.target.value })}
-                placeholder="Úzké schody na půdu, sklep, točité schodiště, parkování daleko, zatáčka na podestě."
-                rows={4}
-                className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink"
-              />
-            </label>
-            <div>
-              <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-paper/30 px-3 text-sm text-paper/80">
-                <ImagePlus className="size-4" />
-                Přidat fotky přístupu
+      <div className="grid w-full min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
+        <div className="min-w-0 space-y-6">
+          {/* 1 · Kusy */}
+          <section id="kalk-krok-1" className="card card-static scroll-mt-28 overflow-hidden">
+            <div className="flex flex-col gap-3 border-b border-line p-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="font-display text-xl font-bold">1 · Co stěhujete</h3>
+                <p className="text-sm text-muted">Klepnutím přidáte kus. Cenu uvidíte v součtu.</p>
+              </div>
+              <label className="relative block min-w-0 sm:w-64">
+                <span className="sr-only">Hledat položku</span>
+                <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" />
                 <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="sr-only"
-                  onChange={(event) => {
-                    addPhotos(event.target.files);
-                    event.target.value = "";
-                  }}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Hledat, třeba klavír"
+                  className={cn(FIELD, "pl-10")}
                 />
               </label>
-              <p className="mt-1 text-xs text-paper/50">
-                Nejvíc {MAX_PHOTOS}. Z počítače je do mailu přiložte ručně, telefon je umí poslat rovnou.
-              </p>
-              {photos.length > 0 && (
-                <ul className="mt-2 grid grid-cols-3 gap-2">
-                  {photos.map((photo) => (
-                    <li key={photo.id} className="relative">
-                      <img src={photo.url} alt="" className="h-16 w-full rounded-md object-cover" />
-                      <button
-                        type="button"
-                        aria-label={`Odebrat fotku ${photo.file.name}`}
-                        onClick={() => removePhoto(photo.id)}
-                        className="absolute top-1 right-1 flex size-7 items-center justify-center rounded-full bg-ink/80 text-paper"
-                      >
-                        <X className="size-3.5" />
+            </div>
+
+            {!query.trim() && (
+              <div className="flex gap-2 overflow-x-auto px-5 pt-4 pb-1" role="group" aria-label="Kategorie">
+                {CATEGORIES.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={cat === category.id}
+                    onClick={() => setCat(category.id)}
+                    className={cn(
+                      "min-h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition-colors",
+                      cat === category.id
+                        ? "border-ink bg-ink text-paper"
+                        : "border-line bg-paper text-muted hover:border-ink/30 hover:text-ink",
+                    )}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <ul className="grid gap-3 p-5 sm:grid-cols-2">
+              {visible.length === 0 && (
+                <li className="px-2 py-8 text-center text-sm text-muted sm:col-span-2">
+                  V seznamu to není. Přidejte to dole jako další položku.
+                </li>
+              )}
+              {visible.map((item) => {
+                const qty = saved.cart[item.id] ?? 0;
+                return (
+                  <li key={item.id}>
+                    <div
+                      className={cn(
+                        "flex min-h-20 items-center gap-3 rounded-2xl border px-4 py-3 transition-colors",
+                        qty > 0 ? "border-accent/60 bg-accent/5" : "border-line bg-paper hover:border-ink/25",
+                      )}
+                    >
+                      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setQty(item.id, qty + 1)}>
+                        <span className="block font-semibold">{item.name}</span>
+                        <span className="block text-xs text-muted">
+                          {formatVolume(item.vol)} · {item.weight} kg · {WEIGHT_LABEL[item.wCat]}
+                          {item.bulky ? " · po schodech jako velmi těžké" : ""}
+                        </span>
                       </button>
+                      <Stepper
+                        qty={qty}
+                        name={item.name}
+                        onChange={(next) => setQty(item.id, next)}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <form
+              className="border-t border-line bg-paper/60 p-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                addExtra();
+              }}
+            >
+              <h4 className="font-display text-lg font-bold">Další položka</h4>
+              <p className="text-sm text-muted">
+                Co v seznamu není. Objem se počítá do kapacity vozu, cenu kusu domluvíme.
+              </p>
+              {saved.extras.length > 0 && (
+                <ul className="mt-3 grid gap-2">
+                  {saved.extras.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex min-h-16 items-center gap-3 rounded-2xl border border-accent/60 bg-accent/5 px-4 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="block font-semibold">{item.name}</span>
+                        <span className="block text-xs text-muted">
+                          {formatVolume(item.vol)} · {item.weight} kg · {WEIGHT_LABEL[item.wCat]}
+                        </span>
+                      </div>
+                      <Stepper qty={item.qty} name={item.name} onChange={(next) => setExtraQty(item.id, next)} />
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={saved.disassembly}
-                onChange={(event) => patch({ disassembly: event.target.checked })}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className={cn(LABEL, "sm:col-span-2")}>
+                  Název
+                  <input
+                    value={draftName}
+                    onChange={(event) => setDraftName(event.target.value)}
+                    placeholder="Třeba piano křídlo, trezor, akvárium"
+                    className={cn(FIELD, "mt-1")}
+                  />
+                </label>
+                <label className={LABEL}>
+                  Počet
+                  <input
+                    inputMode="numeric"
+                    value={draftQty}
+                    onChange={(event) => setDraftQty(event.target.value)}
+                    className={cn(FIELD, "mt-1")}
+                  />
+                </label>
+                <label className={LABEL}>
+                  Jak těžké
+                  <select
+                    value={draftClass}
+                    onChange={(event) => setDraftClass(event.target.value as WeightClass)}
+                    className={cn(FIELD, "mt-1")}
+                  >
+                    {(Object.keys(WEIGHT_LABEL) as WeightClass[]).map((key) => (
+                      <option key={key} value={key}>
+                        {WEIGHT_LABEL[key]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={LABEL}>
+                  Objem m³
+                  <input
+                    inputMode="decimal"
+                    value={draftVol}
+                    onChange={(event) => setDraftVol(event.target.value)}
+                    placeholder="např. 1,5"
+                    className={cn(FIELD, "mt-1")}
+                  />
+                </label>
+                <label className={LABEL}>
+                  Hmotnost kg
+                  <input
+                    inputMode="decimal"
+                    value={draftWeight}
+                    onChange={(event) => setDraftWeight(event.target.value)}
+                    placeholder="např. 80"
+                    className={cn(FIELD, "mt-1")}
+                  />
+                </label>
+              </div>
+              <Button type="submit" variant="ink" className="mt-4">
+                <Plus className="size-4" /> Přidat položku
+              </Button>
+            </form>
+          </section>
+
+          {/* 2 · Patra a trasa */}
+          <section id="kalk-krok-2" className="card card-static scroll-mt-28 p-5">
+            <h3 className="font-display text-xl font-bold">2 · Patra a trasa</h3>
+            <p className="text-sm text-muted">Patra a výtah ovlivní cenu za těžké kusy, trasa dopravné.</p>
+
+            <fieldset className="mt-4 grid gap-4 sm:grid-cols-2">
+              <legend className="sr-only">Patra a výtah</legend>
+              <FloorFields
+                title="Odkud"
+                floors={saved.floorsFrom}
+                lift={saved.liftFrom}
+                onFloors={(floorsFrom) => patch({ floorsFrom })}
+                onLift={(liftFrom) => patch({ liftFrom })}
               />
-              Chci demontáž nábytku
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={saved.packing} onChange={(event) => patch({ packing: event.target.checked })} />
-              Chci zabalit křehké
-            </label>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button type="button" onClick={send} disabled={!quote.lines.length}>
-              Odeslat poptávku
-            </Button>
-            <Button type="button" variant="line" onClick={copyQuote} disabled={!quote.lines.length}>
-              <Copy className="size-4" /> Kopírovat
-            </Button>
-          </div>
-          <button
-            type="button"
-            onClick={clearAll}
-            className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 text-sm text-paper/60"
-          >
-            <Trash2 className="size-4" /> Vymazat
-          </button>
-          {notice && (
-            <p className="mt-2 flex items-start gap-2 text-sm text-sky">
-              <Check className="mt-0.5 size-4 shrink-0" /> {notice}
-            </p>
-          )}
+              <FloorFields
+                title="Kam"
+                floors={saved.floorsTo}
+                lift={saved.liftTo}
+                onFloors={(floorsTo) => patch({ floorsTo })}
+                onLift={(liftTo) => patch({ liftTo })}
+              />
+            </fieldset>
+
+            <div className="mt-6 border-t border-line pt-5">
+              <h4 className="flex items-center gap-2 font-display text-lg font-bold">
+                <Route className="size-4 text-accent" /> Trasa
+              </h4>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <AddressInput
+                  tone="light"
+                  label="Odkud"
+                  value={saved.from}
+                  placeholder="Ulice, město"
+                  onChange={(from) => {
+                    patch({ from });
+                    setFromPoint(null);
+                  }}
+                  onPick={(from, point) => {
+                    patch({ from });
+                    setFromPoint(point);
+                  }}
+                />
+                <AddressInput
+                  tone="light"
+                  label="Kam"
+                  value={saved.to}
+                  placeholder="Ulice, město"
+                  onChange={(to) => {
+                    patch({ to });
+                    setToPoint(null);
+                  }}
+                  onPick={(to, point) => {
+                    patch({ to });
+                    setToPoint(point);
+                  }}
+                />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={saved.includeApproach}
+                    onChange={(event) => patch({ includeApproach: event.target.checked })}
+                  />
+                  Nájezd ze sídla
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={saved.includeReturn}
+                    onChange={(event) => patch({ includeReturn: event.target.checked })}
+                  />
+                  Návrat
+                </label>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button type="button" variant="ink" onClick={calculateRoute} disabled={routing}>
+                  {routing ? <Loader2 className="size-4 animate-spin" /> : <Route className="size-4" />}
+                  Spočítat kilometry
+                </Button>
+                {legs && !saved.useManual && (
+                  <p className="text-sm text-muted">
+                    Nájezd {formatKm(legs.approachKm)}, stěhování {formatKm(legs.moveKm)}, návrat {formatKm(legs.returnKm)}.
+                    {saved.from && saved.to && (
+                      <>
+                        {" "}
+                        <a className="underline hover:text-accent" href={mapsUrl(saved.from, saved.to)} target="_blank" rel="noreferrer">
+                          Mapa
+                        </a>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+              {routeError && (
+                <p role="alert" className="mt-2 text-sm text-accent-deep">
+                  {routeError}
+                </p>
+              )}
+              <label className={cn(LABEL, "mt-4 block sm:max-w-xs")}>
+                Kilometry ručně
+                <input
+                  inputMode="decimal"
+                  value={saved.manual}
+                  onChange={(event) => patch({ manual: event.target.value, useManual: event.target.value.trim() !== "" })}
+                  placeholder="např. 85"
+                  className={cn(FIELD, "mt-1")}
+                />
+              </label>
+              <p className="mt-1 text-xs text-muted">Ruční km přepíšou mapu. Sazba je {PRICE_PER_KM} Kč/km bez DPH.</p>
+            </div>
+          </section>
+
+          {/* 3 · Poptávka */}
+          <section id="kalk-krok-3" className="card card-static scroll-mt-28 p-5">
+            <h3 className="font-display text-xl font-bold">3 · Poptávka</h3>
+            <p className="text-sm text-muted">Pošleme vám to jako nezávaznou poptávku. Cenu potvrdíme po telefonu.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className={LABEL}>
+                Jméno a příjmení
+                <input
+                  id="poptavka-jmeno"
+                  autoComplete="name"
+                  value={saved.name}
+                  onChange={(event) => patch({ name: event.target.value })}
+                  className={cn(FIELD, "mt-1")}
+                />
+              </label>
+              <label className={LABEL}>
+                Telefon
+                <input
+                  id="poptavka-telefon"
+                  type="tel"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  value={saved.phone}
+                  onChange={(event) => patch({ phone: event.target.value })}
+                  placeholder="+420 …"
+                  className={cn(FIELD, "mt-1")}
+                />
+              </label>
+              <label className={LABEL}>
+                E-mail <span className="text-muted">(nepovinné)</span>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  value={saved.email}
+                  onChange={(event) => patch({ email: event.target.value })}
+                  className={cn(FIELD, "mt-1")}
+                />
+              </label>
+              <label className={LABEL}>
+                Termín
+                <input
+                  type="date"
+                  min={today}
+                  value={saved.date}
+                  onChange={(event) => patch({ date: event.target.value })}
+                  className={cn(FIELD, "mt-1")}
+                />
+              </label>
+              <label className={cn(LABEL, "sm:col-span-2")}>
+                Přístup a co kalkulačka nevidí
+                <textarea
+                  value={saved.note}
+                  onChange={(event) => patch({ note: event.target.value })}
+                  placeholder="Úzké schody na půdu, sklep, točité schodiště, parkování daleko, zatáčka na podestě."
+                  rows={4}
+                  className={cn(FIELD, "mt-1 py-2")}
+                />
+              </label>
+              <div className="sm:col-span-2">
+                <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ink/25 px-3 text-sm text-muted transition-colors hover:border-accent hover:text-accent">
+                  <ImagePlus className="size-4" />
+                  Přidat fotky přístupu
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="sr-only"
+                    onChange={(event) => {
+                      addPhotos(event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+                <p className="mt-1 text-xs text-muted">
+                  Nejvíc {MAX_PHOTOS}. Z počítače je do mailu přiložte ručně, telefon je umí poslat rovnou.
+                </p>
+                {photos.length > 0 && (
+                  <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                    {photos.map((photo) => (
+                      <li key={photo.id} className="relative">
+                        <img src={photo.url} alt="" className="h-16 w-full rounded-lg object-cover" />
+                        <button
+                          type="button"
+                          aria-label={`Odebrat fotku ${photo.file.name}`}
+                          onClick={() => removePhoto(photo.id)}
+                          className="absolute top-1 right-1 flex size-7 items-center justify-center rounded-full bg-ink/80 text-paper"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={saved.disassembly}
+                  onChange={(event) => patch({ disassembly: event.target.checked })}
+                />
+                Chci demontáž nábytku
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={saved.packing} onChange={(event) => patch({ packing: event.target.checked })} />
+                Chci zabalit křehké
+              </label>
+            </div>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <Button type="button" onClick={send} disabled={!quote.lines.length}>
+                Odeslat poptávku
+              </Button>
+              <Button type="button" variant="line" onClick={copyQuote} disabled={!quote.lines.length}>
+                <Copy className="size-4" /> Kopírovat
+              </Button>
+              <button
+                type="button"
+                onClick={clearAll}
+                className="ml-auto flex min-h-11 items-center gap-2 text-sm text-muted transition-colors hover:text-accent"
+              >
+                <Trash2 className="size-4" /> Vymazat
+              </button>
+            </div>
+            {notice && (
+              <p role="status" className="mt-3 flex items-start gap-2 text-sm text-ink">
+                <Check className="mt-0.5 size-4 shrink-0 text-accent" /> {notice}
+              </p>
+            )}
+          </section>
         </div>
-        </div>
-      </aside>
+
+        {/* Souhrn */}
+        <aside
+          id="souhrn"
+          className="scroll-mt-28 overflow-hidden rounded-card bg-ink text-paper shadow-lift lg:sticky lg:top-24"
+        >
+          <div className="p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="font-display text-xl font-bold">Souhrn</h3>
+              <span className="text-sm text-paper/70">{pieceCount} ks</span>
+            </div>
+            <div className="mt-4">
+              <div className="mb-2 flex items-end justify-between gap-3">
+                <p className="font-display text-4xl leading-none font-bold">{formatVolume(quote.volume)}</p>
+                <p className="text-xs tracking-widest text-paper/60 uppercase">
+                  z {MAX_VOLUME_M3.toLocaleString("cs-CZ")} m³
+                </p>
+              </div>
+              <div
+                className="relative h-3 overflow-hidden rounded-full bg-ink-soft"
+                role="meter"
+                aria-label="Zaplnění aktuální jízdy"
+                aria-valuemin={0}
+                aria-valuemax={MAX_VOLUME_M3}
+                aria-valuenow={Math.round(rideFill(quote.volume) * MAX_VOLUME_M3)}
+              >
+                <div className="load-fill h-full rounded-full bg-accent" style={{ width: `${rideFill(quote.volume) * 100}%` }} />
+                <span
+                  className="absolute inset-y-0 z-10 w-0.5 bg-sky"
+                  style={{ left: `${(FLAT_31_M3 / MAX_VOLUME_M3) * 100}%` }}
+                  title="Byt 3+1"
+                />
+              </div>
+              <p className="mt-2 text-sm text-paper/80">{loadNote(quote.volume, quote.trips)}</p>
+              <p className="text-sm text-paper/70">
+                Hmotnost {quote.weight.toLocaleString("cs-CZ")} kg
+                {quote.overweight
+                  ? ` — nad orientačních ${PAYLOAD_KG.toLocaleString("cs-CZ")} kg na jízdu. Cenu potvrdíme, může být potřeba další jízda.`
+                  : ""}
+              </p>
+            </div>
+
+            <ul className="mt-4 max-h-36 space-y-1 overflow-y-auto text-sm">
+              {quote.lines.length === 0 && <li className="text-paper/60">Přidejte první kus vlevo.</li>}
+              {quote.lines.map((line) => (
+                <li key={line.id} className="border-b border-paper/10 py-1 text-paper/85">
+                  {line.name} <span className="text-sky">×{line.qty}</span>
+                </li>
+              ))}
+            </ul>
+
+            <dl className="mt-4 space-y-1 border-t border-paper/15 pt-4 text-sm">
+              <Row label={quote.trips > 1 ? `Základní jízda ×${quote.trips}` : "Základní jízda"} value={quote.tripFee} />
+              <Row label="Nakládka a složení" value={quote.items} />
+              <Row label="Patra" value={quote.floors} />
+              <Row label="Odpojení pračky a myčky" value={quote.handling} />
+              <Row label={`Dopravné ${formatKm(quote.distanceKm)}`} value={quote.transport} />
+              <div className="calculator-total flex items-end justify-between gap-3 border-t border-accent pt-3">
+                <dt className="font-display text-lg">Bez DPH</dt>
+                <dd className="font-display text-2xl font-bold text-[#ff5a5f]">{formatKc(quote.net)}</dd>
+              </div>
+              <div className="flex justify-between text-paper/70">
+                <dt>DPH 21 %</dt>
+                <dd>{formatKc(quote.vat)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>S DPH</dt>
+                <dd className="font-semibold">{formatKc(quote.gross)}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs leading-relaxed text-paper/65">{ESTIMATE_CAVEAT}</p>
+
+            <Button
+              type="button"
+              className="mt-4 w-full"
+              disabled={!quote.lines.length}
+              onClick={() => {
+                if (stepDone[2]) void send();
+                else document.getElementById("kalk-krok-3")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              {stepDone[2] ? "Odeslat poptávku" : "Pokračovat k poptávce"}
+            </Button>
+          </div>
+        </aside>
       </div>
+    </div>
+  );
+}
+
+const FIELD =
+  "min-h-11 w-full rounded-xl border border-line bg-paper px-3 text-sm text-ink transition-colors focus:border-accent focus:bg-white";
+const LABEL = "block text-sm font-medium text-ink";
+
+function Stepper({ qty, name, onChange }: { qty: number; name: string; onChange: (next: number) => void }) {
+  if (qty <= 0) {
+    return (
+      <button
+        type="button"
+        aria-label={`Přidat ${name}`}
+        onClick={() => onChange(1)}
+        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-paper transition-transform hover:scale-105 active:scale-95"
+      >
+        <Plus className="size-4" />
+      </button>
+    );
+  }
+  return (
+    <div className="flex shrink-0 items-center gap-1 rounded-full bg-white p-1 shadow-sm ring-1 ring-line">
+      <button
+        type="button"
+        aria-label={`Odebrat ${name}`}
+        onClick={() => onChange(qty - 1)}
+        className="flex size-9 items-center justify-center rounded-full text-ink transition-colors hover:bg-line"
+      >
+        <Minus className="size-4" />
+      </button>
+      <span className="w-6 text-center font-display text-lg font-bold" aria-live="polite">
+        {qty}
+      </span>
+      <button
+        type="button"
+        aria-label={`Přidat ${name}`}
+        onClick={() => onChange(qty + 1)}
+        className="flex size-9 items-center justify-center rounded-full bg-accent text-paper transition-colors hover:bg-accent-deep"
+      >
+        <Plus className="size-4" />
+      </button>
     </div>
   );
 }
@@ -913,9 +1037,9 @@ function FloorFields({
   onLift: (value: LiftKind) => void;
 }) {
   return (
-    <div>
-      <p className="text-xs uppercase tracking-widest text-paper/60">{title}</p>
-      <label className="mt-1 block text-xs text-paper/50">
+    <div className="space-y-3">
+      <p className="text-xs font-semibold tracking-widest text-accent uppercase">{title}</p>
+      <label className={LABEL}>
         Pater nad přízemím
         <input
           type="number"
@@ -923,16 +1047,12 @@ function FloorFields({
           max={30}
           value={floors}
           onChange={(event) => onFloors(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}
-          className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink"
+          className={cn(FIELD, "mt-1")}
         />
       </label>
-      <label className="mt-2 block text-xs text-paper/50">
+      <label className={LABEL}>
         Výtah
-        <select
-          value={lift}
-          onChange={(event) => onLift(event.target.value as LiftKind)}
-          className="mt-1 min-h-11 w-full rounded-md border border-line bg-paper px-2 text-sm text-ink"
-        >
+        <select value={lift} onChange={(event) => onLift(event.target.value as LiftKind)} className={cn(FIELD, "mt-1")}>
           {(Object.keys(LIFT_LABEL) as LiftKind[]).map((key) => (
             <option key={key} value={key}>
               {LIFT_LABEL[key]}
