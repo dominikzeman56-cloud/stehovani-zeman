@@ -82,6 +82,10 @@
 .calculator-step strong { font-family: var(--font-display); font-size: 1.15rem; line-height: 1.1; text-transform: uppercase; }
 .calculator-step small { margin-top: 0.15rem; font-size: 0.8rem; }
 .calculator-total { margin-top: 0.75rem; padding-top: 0.75rem; }
+.desktop-contact-cta { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 20; align-items: center; gap: 0.65rem; min-height: 3.5rem; border-radius: 0.5rem; padding: 0.65rem 1rem; background: var(--color-accent); color: var(--color-paper); box-shadow: 0 0.75rem 1.5rem rgb(20 24 29 / 0.2); transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease; }
+.desktop-contact-cta:hover, .desktop-contact-cta:focus-visible { background: var(--color-accent-deep); box-shadow: 0 1rem 2rem rgb(20 24 29 / 0.26); transform: translateY(-2px); }
+.desktop-contact-cta strong, .desktop-contact-cta small { display: block; line-height: 1.2; }
+.desktop-contact-cta small { margin-top: 0.15rem; font-size: 0.75rem; opacity: 0.82; }
 
 .hero-frame {
   height: clamp(28rem, 78vh, 52rem);

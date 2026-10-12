@@ -76,7 +76,7 @@ export const LIFT_LABEL: Record<LiftKind, string> = {
 
 /** Viditelné u součtu, v poptávce a v mailu. Kalkulačka není závazná cena. */
 export const ESTIMATE_CAVEAT =
-  "Kalkulačka je orientační a počítá s běžným přístupem. Když to nejde normálně — úzké schody na půdu, sklep, zatáčka, kde se to neotočí — řekneme pevnou cenu. Buď platí, nebo to udělá někdo jiný.";
+  "Kalkulačka je orientační a počítá s běžným přístupem. Když je třeba stěhovat atypický nábytek, například holandskou stěnu, nebo je přístup složitý — úzké schody na půdu či do sklepa — řekneme pevnou cenu. Buď platí, nebo to udělá někdo jiný.";
 
 export const CATEGORIES = [
   { id: "kartony", name: "Kartony" },

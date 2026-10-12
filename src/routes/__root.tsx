@@ -37,6 +37,7 @@ export const Route = createRootRoute({
         <HeadContent />
       </head>
       <body>
+        <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async />
         <PreviewHostBridge />
         <AuthProvider>
           <Outlet />

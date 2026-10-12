@@ -163,12 +163,11 @@ export function HomePage() {
             <Reveal className="hero-intro-content mx-auto max-w-6xl px-4 py-16 md:py-24">
               <p className="text-sm font-semibold tracking-[0.18em] text-paper/75 uppercase">Jindřichův Hradec · celá ČR</p>
               <h1 className="mt-4 max-w-2xl font-display text-5xl leading-[0.94] text-paper md:text-7xl">
-                Stěhování bez call centra.
+                S námi je vše lehké.
                 <span className="mt-2 block text-accent">Od roku {COMPANY.since}.</span>
               </h1>
               <p className="mt-7 max-w-xl text-lg text-paper/85">
-                Malá firma, přímé jednání a ohleduplné zacházení s věcmi, které nejsou naše. Byty, kanceláře, zámky i
-                těžké kusy — s pojištěnou přepravou.
+                Byty, firmy, zámky i těžké kusy. Přímá domluva, pojištěná přeprava, celá ČR.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <a href="#kalkulacka" className={buttonVariants({ variant: "primary" })}>Spočítat cenu</a>
@@ -407,6 +406,14 @@ export function HomePage() {
           </p>
         </div>
       </footer>
+
+      <a href={`tel:${phone.tel}`} className="desktop-contact-cta hidden md:flex" aria-label={`Zavolat na číslo ${phone.label}`}>
+        <Phone className="size-4" />
+        <span>
+          <strong>Zavolat</strong>
+          <small>{phone.label}</small>
+        </span>
+      </a>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-ink p-2 text-paper md:hidden">
         <div className="grid grid-cols-3 gap-2">
