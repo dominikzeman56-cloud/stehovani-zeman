@@ -197,7 +197,6 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
 
 export function Calculator() {
   const [saved, setSaved] = useState<Saved>(EMPTY);
-  const [ready, setReady] = useState(false);
   const [cat, setCat] = useState<string>(CATEGORIES[0].id);
   const [query, setQuery] = useState("");
   const [legs, setLegs] = useState<RouteLegs | null>(null);
@@ -218,32 +217,14 @@ export function Calculator() {
   photosRef.current = photos;
 
   useEffect(() => {
+    // Dřívější verze ukládala rozdělaný soupis i kontakt do prohlížeče. Teď se nic neukládá,
+    // refresh začne od nuly, takže po sobě nezůstanou jména a telefony ani na cizím počítači.
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<Saved>;
-        setSaved({
-          ...EMPTY,
-          ...parsed,
-          cart: parsed.cart ?? {},
-          extras: Array.isArray(parsed.extras) ? parsed.extras : [],
-        });
-      }
+      localStorage.removeItem(STORAGE_KEY);
     } catch {
-      /* starý draft nevadí */
-    } finally {
-      setReady(true);
+      /* soukromý režim, nevadí */
     }
   }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-    } catch {
-      /* soukromý režim nebo plná kvóta, kalkulačka běží dál bez uložení */
-    }
-  }, [saved, ready]);
 
   useEffect(() => {
     return () => {
@@ -402,11 +383,6 @@ export function Calculator() {
     setConfirmed(false);
     setSkipPhotos(false);
     setNotice("Kalkulačka je prázdná.");
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* nevadí */
-    }
   }
 
   async function send() {
