@@ -17,6 +17,11 @@ export type CatalogItem = {
    * patro se proto účtuje sazbou velmi těžkého kusu.
    */
   bulky?: boolean;
+  /**
+   * Hustá bedna (knihy). Pár kusů je běžná sazba, ale plné auto beden po schodech
+   * nebo přes dvůr už je práce navíc, kterou kalkulačka neocení. Viz DENSE_NEGOTIATE_COUNT.
+   */
+  dense?: boolean;
 };
 
 export const COMPANY = {
@@ -52,6 +57,16 @@ export const PAYLOAD_KG = 1400;
  */
 export const TRIP_PRICE = 3000;
 export const PRICE_PER_KM = 20;
+/** Donáška od vozu ke dveřím po rovině: tolik metrů se počítá jako jedno patro. */
+export const CARRY_M_PER_FLOOR = 20;
+/** Donáška se zaokrouhluje dolů po tomto kroku, kratší vzdálenost je běžný přístup zdarma. */
+export const CARRY_STEP_M = 10;
+export const CARRY_MAX_M = 300;
+/**
+ * Od tolika hustých beden (knihy) po schodech nebo donášce se cena domlouvá zvlášť.
+ * Pár beden se do sazby vejde, plné auto ne.
+ */
+export const DENSE_NEGOTIATE_COUNT = 20;
 export const VAT_RATE = 0.21;
 
 export const FLOOR_RATES: Record<WeightClass, number> = {
@@ -92,7 +107,7 @@ export const CATEGORIES = [
 export const ITEMS: CatalogItem[] = [
   { id: "karton_s", name: "Karton malý", vol: 0.06, weight: 12, price: 40, cat: "kartony", wCat: "light" },
   { id: "karton_l", name: "Karton velký", vol: 0.12, weight: 18, price: 55, cat: "kartony", wCat: "light" },
-  { id: "karton_knihy", name: "Karton knihy", vol: 0.06, weight: 25, price: 70, cat: "kartony", wCat: "medium" },
+  { id: "karton_knihy", name: "Karton knihy", vol: 0.06, weight: 25, price: 70, cat: "kartony", wCat: "medium", dense: true },
   { id: "karton_sklo", name: "Karton sklo", vol: 0.06, weight: 10, price: 90, cat: "kartony", wCat: "light" },
   { id: "taska", name: "Přepravka / taška", vol: 0.04, weight: 8, price: 30, cat: "kartony", wCat: "light" },
   { id: "lednice_m", name: "Lednice malá", vol: 0.55, weight: 45, price: 280, cat: "spotrebice_velke", wCat: "heavy" },

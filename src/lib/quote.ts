@@ -1,4 +1,8 @@
 import {
+  CARRY_MAX_M,
+  DENSE_NEGOTIATE_COUNT,
+  CARRY_M_PER_FLOOR,
+  CARRY_STEP_M,
   FLOOR_RATES,
   ITEMS,
   MAX_VOLUME_M3,
@@ -35,6 +39,9 @@ export type QuoteInput = {
   cart: Cart;
   floorsFrom: number;
   floorsTo: number;
+  /** Metry po rovině od zaparkovaného vozu ke dveřím (u nakládky, u vykládky). */
+  carryFrom?: number;
+  carryTo?: number;
   liftFrom: LiftKind;
   liftTo: LiftKind;
   legs: RouteLegs | null;
@@ -54,6 +61,7 @@ export type QuoteLine = {
   weight: number;
   price: number;
   floor: number;
+  carry: number;
   handling: number;
 };
 
@@ -64,6 +72,7 @@ export type Quote = {
   trips: number;
   items: number;
   floors: number;
+  carry: number;
   handling: number;
   tripFee: number;
   approachKm: number;
@@ -78,6 +87,8 @@ export type Quote = {
   gross: number;
   fill: number;
   overweight: boolean;
+  /** Hodně hustých beden po schodech nebo donášce: cenu domluvíme zvlášť. */
+  negotiate: boolean;
   manual: boolean;
 };
 
@@ -121,6 +132,13 @@ function floorUnits(floors: number, lift: LiftKind, wCat: WeightClass) {
   return count;
 }
 
+/** Donáška po rovině v ekvivalentu pater. 40 m jsou dvě patra, pod krok nic. Výtah ji neovlivní. */
+function carryUnits(meters: number | undefined) {
+  if (meters === undefined || !Number.isFinite(meters) || meters <= 0) return 0;
+  const clamped = Math.min(CARRY_MAX_M, meters);
+  return (Math.floor(clamped / CARRY_STEP_M) * CARRY_STEP_M) / CARRY_M_PER_FLOOR;
+}
+
 function roundKm(value: number) {
   return Math.round(value * 10) / 10;
 }
@@ -139,6 +157,8 @@ export function computeQuote(input: QuoteInput): Quote {
   let weight = 0;
   let items = 0;
   let floors = 0;
+  let carry = 0;
+  let denseCount = 0;
   let handling = 0;
 
   for (const item of ITEMS) {
@@ -148,13 +168,17 @@ export function computeQuote(input: QuoteInput): Quote {
     const units =
       floorUnits(input.floorsFrom, input.liftFrom, stair) +
       floorUnits(input.floorsTo, input.liftTo, stair);
-    const floor = FLOOR_RATES[stair] * units * qty;
+    const rate = FLOOR_RATES[stair];
+    const floor = rate * units * qty;
+    const carried = Math.round(rate * (carryUnits(input.carryFrom) + carryUnits(input.carryTo)) * qty);
     const handle = (item.handling ?? 0) * qty;
     const price = item.price * qty;
+    if (item.dense) denseCount += qty;
     volume += item.vol * qty;
     weight += item.weight * qty;
     items += price;
     floors += floor;
+    carry += carried;
     handling += handle;
     lines.push({
       id: item.id,
@@ -164,6 +188,7 @@ export function computeQuote(input: QuoteInput): Quote {
       weight: item.weight * qty,
       price,
       floor,
+      carry: carried,
       handling: handle,
     });
   }
@@ -178,9 +203,13 @@ export function computeQuote(input: QuoteInput): Quote {
       floorUnits(input.floorsFrom, input.liftFrom, extra.wCat) +
       floorUnits(input.floorsTo, input.liftTo, extra.wCat);
     const floor = FLOOR_RATES[extra.wCat] * units * qty;
+    const carried = Math.round(
+      FLOOR_RATES[extra.wCat] * (carryUnits(input.carryFrom) + carryUnits(input.carryTo)) * qty,
+    );
     volume += vol * qty;
     weight += kilos * qty;
     floors += floor;
+    carry += carried;
     lines.push({
       id: extra.id,
       name,
@@ -189,6 +218,7 @@ export function computeQuote(input: QuoteInput): Quote {
       weight: kilos * qty,
       price: 0,
       floor,
+      carry: carried,
       handling: 0,
     });
   }
@@ -220,7 +250,7 @@ export function computeQuote(input: QuoteInput): Quote {
 
   const distanceKm = roundKm(approachKm + moveKm * moveTimes + returnKm);
   const transport = Math.round(distanceKm * PRICE_PER_KM);
-  const net = tripFee + items + floors + handling + transport;
+  const net = tripFee + items + floors + carry + handling + transport;
   const vat = Math.round(net * VAT_RATE);
 
   return {
@@ -230,6 +260,7 @@ export function computeQuote(input: QuoteInput): Quote {
     trips,
     items,
     floors,
+    carry,
     handling,
     tripFee,
     approachKm: roundKm(approachKm),
@@ -244,6 +275,7 @@ export function computeQuote(input: QuoteInput): Quote {
     gross: net + vat,
     fill: volume <= 0 ? 0 : Math.min(1, volume / MAX_VOLUME_M3),
     overweight: trips > 0 && weight > trips * PAYLOAD_KG,
+    negotiate: denseCount >= DENSE_NEGOTIATE_COUNT && floors + carry > 0,
     manual,
   };
 }

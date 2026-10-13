@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, ImagePlus, Loader2, Minus, Plus, Route, Search, Trash2, X } from "lucide-react";
-import { CATEGORIES, COMPANY, ESTIMATE_CAVEAT, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
+import { CARRY_MAX_M, CARRY_M_PER_FLOOR, CATEGORIES, COMPANY, ESTIMATE_CAVEAT, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
 import { computeQuote, formatKc, formatKm, formatVolume, readManualKm, type Cart, type ExtraItem, type RouteLegs } from "@/lib/quote";
 import { Button } from "@/components/ui/button";
 import { AddressInput, type Point } from "@/components/address-input";
@@ -16,6 +16,8 @@ type Saved = {
   cart: Cart;
   floorsFrom: number;
   floorsTo: number;
+  carryFrom: number;
+  carryTo: number;
   liftFrom: LiftKind;
   liftTo: LiftKind;
   from: string;
@@ -38,6 +40,8 @@ const EMPTY: Saved = {
   cart: {},
   floorsFrom: 0,
   floorsTo: 0,
+  carryFrom: 0,
+  carryTo: 0,
   liftFrom: "none",
   liftTo: "none",
   from: "",
@@ -133,6 +137,8 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
     cart: saved.cart,
     floorsFrom: saved.floorsFrom,
     floorsTo: saved.floorsTo,
+    carryFrom: saved.carryFrom,
+    carryTo: saved.carryTo,
     liftFrom: saved.liftFrom,
     liftTo: saved.liftTo,
     legs,
@@ -160,8 +166,9 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
     `Hmotnost: ${quote.weight} kg`,
     `Jízdy vozu: ${quote.trips}`,
     "",
-    `Odkud: ${saved.from || "—"} · ${LIFT_LABEL[saved.liftFrom]}, pater ${saved.floorsFrom}`,
-    `Kam: ${saved.to || "—"} · ${LIFT_LABEL[saved.liftTo]}, pater ${saved.floorsTo}`,
+    quote.negotiate ? "POZOR: hodně beden s knihami po schodech/donášce, cenu domluvit zvlášť." : "",
+    `Odkud: ${saved.from || "—"} · ${LIFT_LABEL[saved.liftFrom]}, pater ${saved.floorsFrom}, donáška od vozu ${saved.carryFrom} m`,
+    `Kam: ${saved.to || "—"} · ${LIFT_LABEL[saved.liftTo]}, pater ${saved.floorsTo}, donáška od vozu ${saved.carryTo} m`,
     `Vzdálenost k fakturaci: ${formatKm(quote.distanceKm)}${quote.manual ? " (zadáno ručně)" : ""}`,
     `Demontáž nábytku: ${saved.disassembly ? "ano" : "ne"}`,
     `Zabalit křehké: ${saved.packing ? "ano" : "ne"}`,
@@ -172,6 +179,7 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
     `Základní jízda: ${formatKc(quote.tripFee)}`,
     `Položky: ${formatKc(quote.items)}`,
     `Patra: ${formatKc(quote.floors)}`,
+    `Donáška: ${formatKc(quote.carry)}`,
     `Odpojení pračky/myčky: ${formatKc(quote.handling)}`,
     `Dopravné: ${formatKc(quote.transport)}`,
     `Celkem bez DPH: ${formatKc(quote.net)}`,
@@ -246,6 +254,8 @@ export function Calculator() {
         cart: saved.cart,
         floorsFrom: saved.floorsFrom,
         floorsTo: saved.floorsTo,
+    carryFrom: saved.carryFrom,
+    carryTo: saved.carryTo,
         liftFrom: saved.liftFrom,
         liftTo: saved.liftTo,
         legs,
@@ -545,7 +555,7 @@ export function Calculator() {
                         <span className="block font-semibold">{item.name}</span>
                         <span className="block text-xs text-muted">
                           {formatVolume(item.vol)} · {item.weight} kg · {WEIGHT_LABEL[item.wCat]}
-                          {item.bulky ? " · po schodech jako velmi těžké" : ""}
+                          {item.bulky ? " · po schodech jako velmi těžké" : item.dense ? " · hustá bedna" : ""}
                         </span>
                       </button>
                       <Stepper
@@ -654,12 +664,14 @@ export function Calculator() {
             <p className="text-sm text-muted">Patra a výtah ovlivní cenu za těžké kusy, trasa dopravné.</p>
 
             <fieldset className="mt-4 grid gap-4 sm:grid-cols-2">
-              <legend className="sr-only">Patra a výtah</legend>
+              <legend className="sr-only">Patra, výtah a donáška</legend>
               <FloorFields
                 title="Odkud"
                 floors={saved.floorsFrom}
                 lift={saved.liftFrom}
                 onFloors={(floorsFrom) => patch({ floorsFrom })}
+                carry={saved.carryFrom}
+                onCarry={(carryFrom) => patch({ carryFrom })}
                 onLift={(liftFrom) => patch({ liftFrom })}
               />
               <FloorFields
@@ -667,6 +679,8 @@ export function Calculator() {
                 floors={saved.floorsTo}
                 lift={saved.liftTo}
                 onFloors={(floorsTo) => patch({ floorsTo })}
+                carry={saved.carryTo}
+                onCarry={(carryTo) => patch({ carryTo })}
                 onLift={(liftTo) => patch({ liftTo })}
               />
             </fieldset>
@@ -925,6 +939,12 @@ export function Calculator() {
                 />
               </div>
               <p className="mt-2 text-sm text-paper/80">{loadNote(quote.volume, quote.trips)}</p>
+              {quote.negotiate && (
+                <p className="mt-2 rounded-xl bg-white/10 px-3 py-2 text-sm text-paper">
+                  Hodně beden s knihami po schodech nebo přes dvůr je práce navíc. Cenu s vámi domluvíme zvlášť,
+                  tohle je jen základ.
+                </p>
+              )}
               <p className="text-sm text-paper/70">
                 Hmotnost {quote.weight.toLocaleString("cs-CZ")} kg
                 {quote.overweight
@@ -946,6 +966,7 @@ export function Calculator() {
               <Row label={quote.trips > 1 ? `Základní jízda ×${quote.trips}` : "Základní jízda"} value={quote.tripFee} />
               <Row label="Nakládka a složení" value={quote.items} />
               <Row label="Patra" value={quote.floors} />
+              <Row label="Donáška od vozu" value={quote.carry} />
               <Row label="Odpojení pračky a myčky" value={quote.handling} />
               <Row label={`Dopravné ${formatKm(quote.distanceKm)}`} value={quote.transport} />
               <div className="calculator-total flex items-end justify-between gap-3 border-t border-accent pt-3">
@@ -1029,12 +1050,16 @@ function FloorFields({
   lift,
   onFloors,
   onLift,
+  carry,
+  onCarry,
 }: {
   title: string;
   floors: number;
   lift: LiftKind;
   onFloors: (value: number) => void;
   onLift: (value: LiftKind) => void;
+  carry: number;
+  onCarry: (value: number) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -1059,6 +1084,22 @@ function FloorFields({
             </option>
           ))}
         </select>
+      </label>
+      <label className={LABEL}>
+        Donáška od vozu (m)
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={CARRY_MAX_M}
+          step={10}
+          value={carry}
+          onChange={(event) => onCarry(Math.max(0, Math.min(CARRY_MAX_M, Number(event.target.value) || 0)))}
+          className={cn(FIELD, "mt-1")}
+        />
+        <span className="mt-1 block text-xs font-normal text-muted">
+          Po rovině z místa, kde zastaví vůz, ke dveřím. I přízemí může být daleko: zahrada, dvůr, pěší zóna. {CARRY_M_PER_FLOOR} m se počítá jako jedno patro.
+        </span>
       </label>
     </div>
   );

@@ -15,7 +15,7 @@ registerHooks({
 });
 
 const { computeQuote, readManualKm } = await import("./quote.ts");
-const { FLOOR_RATES, ITEMS, MAX_VOLUME_M3, PRICE_PER_KM, TRIP_PRICE } = await import("../data/catalog.ts");
+const { CARRY_M_PER_FLOOR, DENSE_NEGOTIATE_COUNT, FLOOR_RATES, ITEMS, MAX_VOLUME_M3, PRICE_PER_KM, TRIP_PRICE } = await import("../data/catalog.ts");
 
 type QuoteInput = Parameters<typeof computeQuote>[0];
 
@@ -306,5 +306,41 @@ describe("computeQuote", () => {
     assert.equal(empty.trips, 0);
     assert.equal(empty.net, 0);
     assert.equal(empty.transport, 0);
+  });
+
+  it("bedny s knihami mají běžnou sazbu, od hranice po schodech nebo donášce se cena domlouvá", () => {
+    const few = quoteOf({ cart: { karton_knihy: 10 }, floorsFrom: 4 });
+    assert.equal(few.floors, FLOOR_RATES.medium * 4 * 10);
+    assert.equal(few.negotiate, false);
+
+    const many = quoteOf({ cart: { karton_knihy: DENSE_NEGOTIATE_COUNT }, floorsFrom: 4 });
+    assert.equal(many.negotiate, true);
+    assert.equal(quoteOf({ cart: { karton_knihy: DENSE_NEGOTIATE_COUNT }, carryFrom: 100 }).negotiate, true);
+
+    // plné auto beden v přízemí u vozu nebo v osobním výtahu je běžná práce
+    assert.equal(quoteOf({ cart: { karton_knihy: 40 } }).negotiate, false);
+    assert.equal(quoteOf({ cart: { karton_knihy: 40 }, floorsFrom: 4, liftFrom: "passenger" }).negotiate, false);
+  });
+
+  it("donáška po rovině se počítá jako patra a výtah ji neovlivní", () => {
+    // 40 m = dvě patra, i když je v domě osobní výtah
+    const lift = quoteOf({ cart: { klavir: 1 }, carryFrom: 2 * CARRY_M_PER_FLOOR, liftFrom: "passenger", floorsFrom: 3 });
+    assert.equal(lift.carry, FLOOR_RATES.very_heavy * 2);
+    assert.equal(lift.net, TRIP_PRICE + lift.items + lift.floors + lift.carry);
+
+    // obě strany se sčítají, krok 10 m = půl patra
+    const both = quoteOf({ cart: { karton_s: 4 }, carryFrom: 20, carryTo: 10 });
+    assert.equal(both.carry, Math.round(FLOOR_RATES.light * 1.5 * 4));
+
+    // pod krok se neúčtuje, nesmysly se ignorují, strop je 300 m
+    assert.equal(quoteOf({ cart: { klavir: 1 }, carryFrom: 9 }).carry, 0);
+    assert.equal(quoteOf({ cart: { klavir: 1 }, carryFrom: -5, carryTo: Number.NaN }).carry, 0);
+    assert.equal(
+      quoteOf({ cart: { klavir: 1 }, carryFrom: 5000 }).carry,
+      quoteOf({ cart: { klavir: 1 }, carryFrom: 300 }).carry,
+    );
+
+    // bez donášky se nic nemění
+    assert.equal(quoteOf({ cart: { klavir: 1 } }).carry, 0);
   });
 });

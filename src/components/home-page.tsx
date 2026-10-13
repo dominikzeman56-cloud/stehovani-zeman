@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Mail, MapPin, Menu, Phone, X } from "lucide-react";
-import { COMPANY, ESTIMATE_CAVEAT, FLOOR_RATES, MAX_VOLUME_M3, PRICE_PER_KM, TRIP_PRICE } from "@/data/catalog";
+import { CARRY_M_PER_FLOOR, DENSE_NEGOTIATE_COUNT, CARRY_STEP_M, COMPANY, ESTIMATE_CAVEAT, FLOOR_RATES, MAX_VOLUME_M3, PRICE_PER_KM, TRIP_PRICE } from "@/data/catalog";
 import { formatKc } from "@/lib/quote";
 import { Calculator } from "@/components/calculator";
 import { Reveal } from "@/components/reveal";
@@ -274,6 +274,12 @@ export function HomePage() {
                   {formatKc(FLOOR_RATES.very_heavy)} za patro a kus. Krabice po schodech skoro nic nestojí. Piano a trezor
                   ano. Posuvná skříň a křídlo jsou dlouhé: v paneláku se s nimi na podestě neotočí, takže patra mají
                   sazbu velmi těžkého kusu, i když skříň nemá kila piana. Přízemí je nula.
+                </li>
+                <li>
+                  Donáška od vozu ke dveřím po rovině se počítá jako patra: {CARRY_M_PER_FLOOR} m jsou jedno patro, tedy
+                  40 m jsou dvě. Pod {CARRY_STEP_M} m se neúčtuje nic. Platí pro nakládku i vykládku zvlášť a výtah ji
+                  neovlivní. Pár beden s knihami se do sazby vejde. Když jich je hodně (od {DENSE_NEGOTIATE_COUNT} kusů)
+                  a nosí se po schodech nebo přes dvůr, cenu domluvíme zvlášť.
                 </li>
                 <li>
                   Osobní výtah: příplatek jen u těžkých a velmi těžkých kusů a u dlouhých, co se do něj nevejdou.
