@@ -153,6 +153,7 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
     "Dobrý den,",
     "",
     "posílám orientační poptávku ze webu:",
+    "Soupis je podklad pro cenu a plánování vozu. Věci navíc mohou změnit cenu.",
     "",
     `Jméno: ${saved.name || "—"}`,
     `Telefon: ${saved.phone || "—"}`,
@@ -203,6 +204,8 @@ export function Calculator() {
   const [routeError, setRouteError] = useState("");
   const [routing, setRouting] = useState(false);
   const [notice, setNotice] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [skipPhotos, setSkipPhotos] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftQty, setDraftQty] = useState("1");
   const [draftVol, setDraftVol] = useState("");
@@ -396,6 +399,8 @@ export function Calculator() {
     setToPoint(null);
     setRouteError("");
     setQuery("");
+    setConfirmed(false);
+    setSkipPhotos(false);
     setNotice("Kalkulačka je prázdná.");
     try {
       localStorage.removeItem(STORAGE_KEY);
@@ -414,6 +419,16 @@ export function Calculator() {
     if (saved.phone.replace(/\D/g, "").length < 9) {
       setNotice("Telefon vypadá krátký. Napište ho celý, ať vám můžeme zavolat.");
       document.getElementById("poptavka-telefon")?.focus();
+      return;
+    }
+    if (!confirmed) {
+      setNotice("Potvrďte, že soupis odpovídá tomu, co se bude stěhovat.");
+      document.getElementById("poptavka-potvrzeni")?.focus();
+      return;
+    }
+    if (!photos.length && !skipPhotos) {
+      setSkipPhotos(true);
+      setNotice("Bez fotek se vejde-nevejde posuzuje hůř. Přidejte je, nebo klepněte na Odeslat poptávku ještě jednou.");
       return;
     }
     const files = photos.map((photo) => photo.file);
@@ -656,6 +671,15 @@ export function Calculator() {
                 <Plus className="size-4" /> Přidat položku
               </Button>
             </form>
+
+            <div className="border-t border-line bg-accent/5 p-5 text-sm">
+              <p className="font-display text-base font-bold">Než půjdete dál, projděte byt ještě jednou</p>
+              <p className="mt-1 text-muted">
+                Sklep, půda, garáž, balkon, zahrada, kola, koberce, lustry a závěsy, květiny, věci za skříněmi.
+                Vůz plánujeme podle vašeho soupisu, proto čím je přesnější, tím líp. Fotky místností a věcí přiložte
+                v poptávce, podle nich nejlíp posoudíme, co se do vozu vejde.
+              </p>
+            </div>
           </section>
 
           {/* 2 · Patra a trasa */}
@@ -837,7 +861,7 @@ export function Calculator() {
               <div className="sm:col-span-2">
                 <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ink/25 px-3 text-sm text-muted transition-colors hover:border-accent hover:text-accent">
                   <ImagePlus className="size-4" />
-                  Přidat fotky přístupu
+                  Přidat fotky místností a přístupu (doporučujeme)
                   <input
                     type="file"
                     accept="image/*"
@@ -850,7 +874,7 @@ export function Calculator() {
                   />
                 </label>
                 <p className="mt-1 text-xs text-muted">
-                  Nejvíc {MAX_PHOTOS}. Z počítače je do mailu přiložte ručně, telefon je umí poslat rovnou.
+                  Podle fotek nejlíp posoudíme, co se vejde do vozu a jak se k věcem dostaneme. Nejvíc {MAX_PHOTOS}. Z počítače je do mailu přiložte ručně, telefon je umí poslat rovnou.
                 </p>
                 {photos.length > 0 && (
                   <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -883,7 +907,20 @@ export function Calculator() {
                 Chci zabalit křehké
               </label>
             </div>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
+            <label className="mt-5 flex items-start gap-3 rounded-xl border border-line bg-paper p-3 text-sm">
+              <input
+                id="poptavka-potvrzeni"
+                type="checkbox"
+                checked={confirmed}
+                onChange={(event) => setConfirmed(event.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Soupis odpovídá tomu, co se bude stěhovat. Rozumím, že kalkulačka je orientační a věci navíc mohou
+                změnit cenu.
+              </span>
+            </label>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <Button type="button" onClick={send} disabled={!quote.lines.length}>
                 Odeslat poptávku
               </Button>
@@ -939,6 +976,12 @@ export function Calculator() {
                 />
               </div>
               <p className="mt-2 text-sm text-paper/80">{loadNote(quote.volume, quote.trips)}</p>
+              {quote.trips > 0 && rideFill(quote.volume) >= 0.85 && (
+                <p className="mt-2 rounded-xl bg-white/10 px-3 py-2 text-sm text-paper">
+                  Vůz se plní. Kalkulačka je jen orientační, jak se věci do vozu opravdu vejdou, posoudíme podle vašeho
+                  soupisu a fotek.
+                </p>
+              )}
               {quote.negotiate && (
                 <p className="mt-2 rounded-xl bg-white/10 px-3 py-2 text-sm text-paper">
                   Hodně beden s knihami po schodech nebo přes dvůr je práce navíc. Cenu s vámi domluvíme zvlášť,
