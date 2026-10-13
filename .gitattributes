@@ -1,0 +1,2 @@
+# Generovaný TanStack Routerem, píše ho vždy s LF. Bez toho ho git na Windows hlásí jako změněný.
+src/routeTree.gen.ts text eol=lf
