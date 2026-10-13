@@ -1109,14 +1109,7 @@ function FloorFields({
       <p className="text-xs font-semibold tracking-widest text-accent uppercase">{title}</p>
       <label className={LABEL}>
         Pater nad přízemím
-        <input
-          type="number"
-          min={0}
-          max={30}
-          value={floors}
-          onChange={(event) => onFloors(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}
-          className={cn(FIELD, "mt-1")}
-        />
+        <NumberField value={floors} max={30} onChange={onFloors} className={cn(FIELD, "mt-1")} />
       </label>
       <label className={LABEL}>
         Výtah
@@ -1130,21 +1123,56 @@ function FloorFields({
       </label>
       <label className={LABEL}>
         Donáška od vozu (m)
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={CARRY_MAX_M}
-          step={10}
-          value={carry}
-          onChange={(event) => onCarry(Math.max(0, Math.min(CARRY_MAX_M, Number(event.target.value) || 0)))}
-          className={cn(FIELD, "mt-1")}
-        />
+        <NumberField value={carry} max={CARRY_MAX_M} step={10} onChange={onCarry} className={cn(FIELD, "mt-1")} />
         <span className="mt-1 block text-xs font-normal text-muted">
           Po rovině z místa, kde zastaví vůz, ke dveřím. I přízemí může být daleko: zahrada, dvůr, pěší zóna. {CARRY_M_PER_FLOOR} m se počítá jako jedno patro.
         </span>
       </label>
     </div>
+  );
+}
+
+/**
+ * Celé nezáporné číslo, které jde při psaní úplně smazat. Řízený `type="number"` s `|| 0`
+ * by prázdné pole hned vrátil na "0" a nešlo by přepsat. Prázdné pole se počítá jako 0,
+ * po opuštění se zobrazí normalizovaná hodnota.
+ */
+function NumberField({
+  value,
+  max,
+  step,
+  onChange,
+  className,
+}: {
+  value: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  className?: string;
+}) {
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    // Změna zvenku (vymazání kalkulačky, načtený koncept), ne vlastní psaní.
+    setText((current) => ((Number(current) || 0) === value ? current : String(value)));
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={0}
+      max={max}
+      step={step}
+      placeholder="0"
+      value={text}
+      onChange={(event) => {
+        setText(event.target.value);
+        onChange(Math.max(0, Math.min(max, Math.floor(Number(event.target.value)) || 0)));
+      }}
+      onBlur={() => setText(String(value))}
+      className={className}
+    />
   );
 }
 
