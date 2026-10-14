@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, ImagePlus, Loader2, Minus, Plus, Route, Search, Trash2, X } from "lucide-react";
-import { CARRY_MAX_M, CARRY_M_PER_FLOOR, CATEGORIES, COMPANY, ESTIMATE_CAVEAT, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
+import { CARGO_CM, CARRY_MAX_M, CARRY_M_PER_FLOOR, CATEGORIES, COMPANY, ESTIMATE_CAVEAT, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
 import { HOME_COUNTRY, SERVED_COUNTRY_CODES, abroadCountries, nominatimUrl, parseNominatim } from "@/lib/geo";
 import { computeQuote, formatKc, formatKm, formatVolume, isDistanceUnknown, readManualKm, type Cart, type ExtraItem, type RouteLegs } from "@/lib/quote";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { AddressInput, type Point } from "@/components/address-input";
 import { cn } from "@/lib/cn";
 import { submitInquiry } from "@/lib/submit-inquiry";
 import { parsePrefill } from "@/lib/prefill";
+import { SPACE_LABEL, boxVolumeM3, fitsCargo, spaceCheck } from "@/lib/space";
 
 const STORAGE_KEY = "zeman-kalkulacka-v1";
 const MAX_PHOTOS = 6;
@@ -137,6 +138,13 @@ function canSharePhotos(files: File[]) {
   }
 }
 
+function spaceMailLine(volume: number) {
+  const space = spaceCheck(volume);
+  if (!space) return "";
+  const reserve = space.reserve >= 0 ? `zbývá cca ${formatVolume(space.reserve)}` : `chybí cca ${formatVolume(-space.reserve)}`;
+  return `Kontrola místa: ${SPACE_LABEL[space.status]} (kusy ${formatVolume(space.volume)}, při skládání cca ${formatVolume(space.needed)} z ${formatVolume(MAX_VOLUME_M3)}, ${reserve})`;
+}
+
 function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0, abroad: string[] = [], attached = false) {
   const quote = computeQuote({
     cart: saved.cart,
@@ -172,6 +180,7 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0, abroad:
     `Objem: ${formatVolume(quote.volume)}`,
     `Hmotnost: ${quote.weight} kg`,
     `Jízdy vozu: ${quote.trips}`,
+    spaceMailLine(quote.volume),
     "",
     quote.negotiate ? "POZOR: hodně beden s knihami po schodech/donášce, cenu domluvit zvlášť." : "",
     abroad.length ? `POZOR: adresa mimo ČR (${abroad.join(", ")}), cenu jízdy potvrdit.` : "",
@@ -221,6 +230,7 @@ export function Calculator({ prefillFromUrl = false }: { prefillFromUrl?: boolea
   const [draftName, setDraftName] = useState("");
   const [draftQty, setDraftQty] = useState("1");
   const [draftVol, setDraftVol] = useState("");
+  const [draftDims, setDraftDims] = useState({ l: "", w: "", h: "" });
   const [draftWeight, setDraftWeight] = useState("");
   const [draftClass, setDraftClass] = useState<WeightClass>("medium");
   const [checkIds, setCheckIds] = useState<string[]>([]);
@@ -328,11 +338,15 @@ export function Calculator({ prefillFromUrl = false }: { prefillFromUrl?: boolea
       return;
     }
     const qty = Math.min(99, Math.max(1, Math.round(Number(draftQty.replace(",", ".")) || 1)));
-    const vol = Math.max(0, Number(draftVol.replace(",", ".")) || 0);
+    const dims = [draftDims.l, draftDims.w, draftDims.h].map((value) => Math.max(0, Number(value.replace(",", ".")) || 0));
+    const hasDims = dims.every((value) => value > 0);
+    const typedVol = Math.max(0, Number(draftVol.replace(",", ".")) || 0);
+    // Zadaný objem má přednost. Jinak se spočítá z rozměrů (obálka kusu v cm).
+    const vol = typedVol > 0 ? typedVol : hasDims ? boxVolumeM3(dims[0], dims[1], dims[2]) : 0;
     const weight = Math.max(0, Number(draftWeight.replace(",", ".")) || 0);
     const extra: ExtraItem = {
       id: `extra-${Date.now()}`,
-      name,
+      name: hasDims ? `${name} ${dims.join("×")} cm` : name,
       qty,
       vol,
       weight,
@@ -342,6 +356,7 @@ export function Calculator({ prefillFromUrl = false }: { prefillFromUrl?: boolea
     setDraftName("");
     setDraftQty("1");
     setDraftVol("");
+    setDraftDims({ l: "", w: "", h: "" });
     setDraftWeight("");
     setNotice("");
   }
@@ -521,6 +536,10 @@ export function Calculator({ prefillFromUrl = false }: { prefillFromUrl?: boolea
     Object.values(saved.cart).reduce((sum, qty) => sum + qty, 0) +
     saved.extras.reduce((sum, item) => sum + item.qty, 0);
 
+  const dimNumbers = [draftDims.l, draftDims.w, draftDims.h].map((value) => Number(value.replace(",", ".")) || 0);
+  const dimsVolume = boxVolumeM3(dimNumbers[0], dimNumbers[1], dimNumbers[2]);
+  const dimsFit = dimsVolume === 0 || fitsCargo(dimNumbers[0], dimNumbers[1], dimNumbers[2]);
+  const space = spaceCheck(quote.volume);
   const cartRows = ITEMS.filter((item) => (saved.cart[item.id] ?? 0) > 0);
   const hasRoute = quote.distanceKm > 0 || saved.useManual;
   const distanceUnknown = isDistanceUnknown(quote, legs);
@@ -761,6 +780,43 @@ export function Calculator({ prefillFromUrl = false }: { prefillFromUrl?: boolea
                     ))}
                   </select>
                 </label>
+                <fieldset className="sm:col-span-2">
+                  <legend className={LABEL}>
+                    Rozměry v cm <span className="font-normal text-muted">(délka × šířka × výška, nepovinné)</span>
+                  </legend>
+                  <div className="mt-1 grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        ["l", "délka"],
+                        ["w", "šířka"],
+                        ["h", "výška"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <input
+                        key={key}
+                        inputMode="numeric"
+                        aria-label={`Rozměr ${label} v cm`}
+                        placeholder={label}
+                        value={draftDims[key]}
+                        onChange={(event) => setDraftDims((current) => ({ ...current, [key]: event.target.value }))}
+                        className={FIELD}
+                      />
+                    ))}
+                  </div>
+                  {dimsVolume > 0 && (
+                    <p className="mt-1 text-xs text-muted">
+                      Objem z rozměrů: <strong className="text-ink">{formatVolume(dimsVolume)}</strong>
+                      {draftVol.trim() ? " (zadaný objem níže má přednost)" : ""}.
+                      {!dimsFit && (
+                        <span className="text-accent-deep">
+                          {" "}
+                          Kus je větší než ložný prostor ({CARGO_CM.length.toLocaleString("cs-CZ")} × {CARGO_CM.height} ×{" "}
+                          {CARGO_CM.width} cm). Popište ho v poznámce, domluvíme se.
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </fieldset>
                 <label className={LABEL}>
                   Objem m³
                   <input
@@ -1111,11 +1167,31 @@ export function Calculator({ prefillFromUrl = false }: { prefillFromUrl?: boolea
                 />
               </div>
               <p className="mt-2 text-sm text-paper/80">{loadNote(quote.volume, quote.trips)}</p>
-              {quote.trips > 0 && rideFill(quote.volume) >= 0.85 && (
-                <p className="mt-2 rounded-xl bg-white/10 px-3 py-2 text-sm text-paper">
-                  Vůz se plní. Kalkulačka je jen orientační, jak se věci do vozu opravdu vejdou, posoudíme podle vašeho
-                  soupisu a fotek.
-                </p>
+              {space && (
+                <div className="mt-3 rounded-xl bg-white/10 px-3 py-2.5 text-sm text-paper" aria-live="polite">
+                  <p className="flex items-center gap-2 font-semibold">
+                    <span
+                      className={cn(
+                        "size-2.5 shrink-0 rounded-full",
+                        space.status === "enough" && "bg-emerald-400",
+                        space.status === "tight" && "bg-amber-300",
+                        (space.status === "edge" || space.status === "over") && "bg-[#ff5a5f]",
+                      )}
+                      aria-hidden="true"
+                    />
+                    Kontrola místa: {SPACE_LABEL[space.status]}
+                  </p>
+                  <p className="mt-1 text-paper/80">
+                    Kusy zabírají {formatVolume(space.volume)}. Při skládání počítáme asi {formatVolume(space.needed)} prostoru
+                    z {formatVolume(MAX_VOLUME_M3)}
+                    {space.reserve >= 0
+                      ? `, zbývá zhruba ${formatVolume(space.reserve)}.`
+                      : `, chybí zhruba ${formatVolume(-space.reserve)}.`}
+                  </p>
+                  <p className="mt-1 text-xs text-paper/65">
+                    Orientační: jak se věci opravdu vejdou, posoudíme podle soupisu a fotek.
+                  </p>
+                </div>
               )}
               {quote.negotiate && (
                 <p className="mt-2 rounded-xl bg-white/10 px-3 py-2 text-sm text-paper">

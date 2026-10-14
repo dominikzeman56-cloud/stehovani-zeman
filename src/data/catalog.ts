@@ -45,6 +45,10 @@ export const COMPANY = {
 
 /** IVECO Daily 3.0, nákladový prostor změřený firmou. */
 export const MAX_VOLUME_M3 = 18.73;
+/** Rozměry ložného prostoru Daily v cm (změřené firmou). Mezi podběhy je 131,7 cm. */
+export const CARGO_CM = { length: 512.5, width: 174, height: 210, betweenArches: 131.7 };
+/** Kolik objemu se při skládání opravdu využije. Zbytek jsou mezery mezi kusy. Orientační. */
+export const PACK_EFFICIENCY = 0.8;
 /** Orientační objem zabaleného bytu 3+1. Vejde se do jedné jízdy. */
 export const FLAT_31_M3 = 16.8;
 /** Orientační užitečná hmotnost jedné jízdy — jen upozornění, ne sazba. */
