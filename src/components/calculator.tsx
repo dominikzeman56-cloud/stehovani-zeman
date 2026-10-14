@@ -5,6 +5,7 @@ import { computeQuote, formatKc, formatKm, formatVolume, readManualKm, type Cart
 import { Button } from "@/components/ui/button";
 import { AddressInput, type Point } from "@/components/address-input";
 import { cn } from "@/lib/cn";
+import { submitInquiry } from "@/lib/submit-inquiry";
 
 const STORAGE_KEY = "zeman-kalkulacka-v1";
 const MAX_PHOTOS = 6;
@@ -205,6 +206,10 @@ export function Calculator() {
   const [notice, setNotice] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [skipPhotos, setSkipPhotos] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const submissionId = useRef(crypto.randomUUID());
+  const honeypot = useRef<HTMLInputElement>(null);
   const [draftName, setDraftName] = useState("");
   const [draftQty, setDraftQty] = useState("1");
   const [draftVol, setDraftVol] = useState("");
@@ -382,6 +387,7 @@ export function Calculator() {
     setQuery("");
     setConfirmed(false);
     setSkipPhotos(false);
+    setSent(false);
     setNotice("Kalkulačka je prázdná.");
   }
 
@@ -409,6 +415,33 @@ export function Calculator() {
     }
     const files = photos.map((photo) => photo.file);
     const { body } = buildMail(saved, legs, files.length);
+
+    // Hlavní cesta: poptávka s fotkami jde na server a přijde e-mailem. Když server není
+    // nastavený nebo spadne, použije se e-mail z prohlížeče jako dřív.
+    setSending(true);
+    const result = await submitInquiry({
+      submissionId: submissionId.current,
+      name: saved.name.trim(),
+      phone: saved.phone.trim(),
+      email: saved.email.trim(),
+      body,
+      gross: quote.gross,
+      from: saved.from.trim(),
+      to: saved.to.trim(),
+      website: honeypot.current?.value ?? "",
+      photos: files,
+    });
+    setSending(false);
+    if (result.ok) {
+      setSent(true);
+      submissionId.current = crypto.randomUUID();
+      setNotice("Poptávka je odeslaná. Ozveme se vám na uvedený telefon.");
+      return;
+    }
+    if (!result.fallback) {
+      setNotice(result.message);
+      return;
+    }
     if (canSharePhotos(files)) {
       try {
         await navigator.share({ files, title: "Poptávka stěhování z webu", text: body });
@@ -422,7 +455,7 @@ export function Calculator() {
     window.location.href = href;
     setNotice(
       files.length
-        ? "Mail se otevřel bez fotek. Prohlížeč je k němu nepřipojí — přetáhněte je do zprávy."
+        ? "Odeslání na server se nepovedlo, otevřel se e-mail bez fotek. Prohlížeč je k němu nepřipojí — přetáhněte je do zprávy."
         : "Otevírá se e-mail. Když se nic nestane, text poptávky zkopírujte.",
     );
   }
@@ -883,6 +916,12 @@ export function Calculator() {
                 Chci zabalit křehké
               </label>
             </div>
+            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <label>
+                Web (nevyplňujte)
+                <input ref={honeypot} type="text" name="website" tabIndex={-1} autoComplete="off" />
+              </label>
+            </div>
             <label className="mt-5 flex items-start gap-3 rounded-xl border border-line bg-paper p-3 text-sm">
               <input
                 id="poptavka-potvrzeni"
@@ -897,8 +936,9 @@ export function Calculator() {
               </span>
             </label>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button type="button" onClick={send} disabled={!quote.lines.length}>
-                Odeslat poptávku
+              <Button type="button" onClick={send} disabled={!quote.lines.length || sending}>
+                {sending ? <Loader2 className="size-4 animate-spin" /> : null}
+                {sending ? "Odesílám…" : sent ? "Odeslat znovu" : "Odeslat poptávku"}
               </Button>
               <Button type="button" variant="line" onClick={copyQuote} disabled={!quote.lines.length}>
                 <Copy className="size-4" /> Kopírovat
