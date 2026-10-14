@@ -40,7 +40,7 @@ function CalculatorPage() {
           </p>
         </div>
         <div className="mt-8">
-          <Calculator />
+          <Calculator prefillFromUrl />
         </div>
         <p className="mt-8 max-w-3xl text-xs text-muted">{ESTIMATE_CAVEAT}</p>
       </div>

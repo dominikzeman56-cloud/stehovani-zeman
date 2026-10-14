@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AddressInput, type Point } from "@/components/address-input";
 import { cn } from "@/lib/cn";
 import { submitInquiry } from "@/lib/submit-inquiry";
+import { parsePrefill } from "@/lib/prefill";
 
 const STORAGE_KEY = "zeman-kalkulacka-v1";
 const MAX_PHOTOS = 6;
@@ -202,7 +203,8 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0, abroad:
   return { quote, body };
 }
 
-export function Calculator() {
+/** `prefillFromUrl`: soupis, patra a adresy se předvyplní z odkazu (?items=...), viz lib/prefill. */
+export function Calculator({ prefillFromUrl = false }: { prefillFromUrl?: boolean } = {}) {
   const [saved, setSaved] = useState<Saved>(EMPTY);
   const [cat, setCat] = useState<string>(CATEGORIES[0].id);
   const [query, setQuery] = useState("");
@@ -221,6 +223,9 @@ export function Calculator() {
   const [draftVol, setDraftVol] = useState("");
   const [draftWeight, setDraftWeight] = useState("");
   const [draftClass, setDraftClass] = useState<WeightClass>("medium");
+  const [checkIds, setCheckIds] = useState<string[]>([]);
+  const [prefilled, setPrefilled] = useState(false);
+  const [autoRoute, setAutoRoute] = useState(false);
   const [fromPoint, setFromPoint] = useState<Point | null>(null);
   const [toPoint, setToPoint] = useState<Point | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -237,6 +242,37 @@ export function Calculator() {
       /* soukromý režim, nevadí */
     }
   }, []);
+
+  useEffect(() => {
+    if (!prefillFromUrl) return;
+    const prefill = parsePrefill(window.location.search);
+    if (!prefill) return;
+    setSaved((current) => ({
+      ...current,
+      cart: prefill.cart,
+      ...(prefill.floorsFrom !== undefined ? { floorsFrom: prefill.floorsFrom } : {}),
+      ...(prefill.floorsTo !== undefined ? { floorsTo: prefill.floorsTo } : {}),
+      ...(prefill.liftFrom ? { liftFrom: prefill.liftFrom } : {}),
+      ...(prefill.liftTo ? { liftTo: prefill.liftTo } : {}),
+      ...(prefill.carryFrom !== undefined ? { carryFrom: prefill.carryFrom } : {}),
+      ...(prefill.carryTo !== undefined ? { carryTo: prefill.carryTo } : {}),
+      ...(prefill.from ? { from: prefill.from } : {}),
+      ...(prefill.to ? { to: prefill.to } : {}),
+    }));
+    setCheckIds(prefill.check);
+    setFromPoint(prefill.fromPoint ?? null);
+    setToPoint(prefill.toPoint ?? null);
+    setPrefilled(true);
+    // Když odkaz nese přesné body obou adres, kilometry se spočítají hned.
+    if (prefill.fromPoint && prefill.toPoint) setAutoRoute(true);
+  }, [prefillFromUrl]);
+
+  useEffect(() => {
+    if (!autoRoute || !fromPoint || !toPoint) return;
+    setAutoRoute(false);
+    void calculateRoute();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRoute, fromPoint, toPoint]);
 
   useEffect(() => {
     return () => {
@@ -485,6 +521,7 @@ export function Calculator() {
     Object.values(saved.cart).reduce((sum, qty) => sum + qty, 0) +
     saved.extras.reduce((sum, item) => sum + item.qty, 0);
 
+  const cartRows = ITEMS.filter((item) => (saved.cart[item.id] ?? 0) > 0);
   const hasRoute = quote.distanceKm > 0 || saved.useManual;
   const distanceUnknown = isDistanceUnknown(quote, legs);
   const stepDone = [pieceCount > 0, hasRoute, Boolean(saved.name.trim() && saved.phone.trim())];
@@ -548,6 +585,64 @@ export function Calculator() {
                 />
               </label>
             </div>
+
+            {pieceCount > 0 && (
+              <div className="border-b border-line bg-paper/60 p-5">
+                {prefilled && (
+                  <p className="mb-4 rounded-xl bg-accent/10 px-3 py-2 text-sm">
+                    Připravili jsme soupis podle vaší poptávky. U položek označených <strong>Ověřte</strong> jsme museli
+                    odhadnout typ nebo velikost: opravte je (špatnou ubrat tlačítkem − a správnou přidat z nabídky níže),
+                    nebo klepněte na Ověřte, když sedí. Doplňte, co v soupisu chybí, a přiložte fotky.
+                  </p>
+                )}
+                <h4 className="font-display text-lg font-bold">
+                  Váš soupis <span className="text-sm font-normal text-muted">({pieceCount} ks)</span>
+                </h4>
+                <ul className="mt-3 grid gap-2">
+                  {cartRows.map((item) => {
+                    const flagged = checkIds.includes(item.id);
+                    return (
+                      <li
+                        key={item.id}
+                        className={cn(
+                          "flex items-center gap-3 rounded-2xl border bg-white px-4 py-2.5",
+                          flagged ? "border-amber-400 bg-amber-50" : "border-line",
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="block font-semibold">{item.name}</span>
+                          <span className="block text-xs text-muted">
+                            {formatVolume(item.vol)} · {item.weight} kg · {WEIGHT_LABEL[item.wCat]}
+                          </span>
+                        </div>
+                        {flagged && (
+                          <button
+                            type="button"
+                            title="Typ nebo velikost jsme odhadli. Klepnutím potvrdíte, že sedí."
+                            onClick={() => setCheckIds((ids) => ids.filter((id) => id !== item.id))}
+                            className="shrink-0 rounded-full border border-amber-500 bg-white px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                          >
+                            Ověřte
+                          </button>
+                        )}
+                        <Stepper qty={saved.cart[item.id] ?? 0} name={item.name} onChange={(next) => setQty(item.id, next)} />
+                      </li>
+                    );
+                  })}
+                  {saved.extras.map((item) => (
+                    <li key={item.id} className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <span className="block font-semibold">{item.name}</span>
+                        <span className="block text-xs text-muted">
+                          {formatVolume(item.vol)} · {item.weight} kg · {WEIGHT_LABEL[item.wCat]}
+                        </span>
+                      </div>
+                      <Stepper qty={item.qty} name={item.name} onChange={(next) => setExtraQty(item.id, next)} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {!query.trim() && (
               <div className="flex gap-2 overflow-x-auto px-5 pt-4 pb-1" role="group" aria-label="Kategorie">
