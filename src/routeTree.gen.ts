@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as KalkulackaRouteImport } from './routes/kalkulacka'
 import { Route as ApiPoptavkaRouteImport } from './routes/api/poptavka'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KalkulackaRoute = KalkulackaRouteImport.update({
+  id: '/kalkulacka',
+  path: '/kalkulacka',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPoptavkaRoute = ApiPoptavkaRouteImport.update({
@@ -25,27 +31,31 @@ const ApiPoptavkaRoute = ApiPoptavkaRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/kalkulacka': typeof KalkulackaRoute
   '/api/poptavka': typeof ApiPoptavkaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/kalkulacka': typeof KalkulackaRoute
   '/api/poptavka': typeof ApiPoptavkaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/kalkulacka': typeof KalkulackaRoute
   '/api/poptavka': typeof ApiPoptavkaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/poptavka'
+  fullPaths: '/' | '/kalkulacka' | '/api/poptavka'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/poptavka'
-  id: '__root__' | '/' | '/api/poptavka'
+  to: '/' | '/kalkulacka' | '/api/poptavka'
+  id: '__root__' | '/' | '/kalkulacka' | '/api/poptavka'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  KalkulackaRoute: typeof KalkulackaRoute
   ApiPoptavkaRoute: typeof ApiPoptavkaRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kalkulacka': {
+      id: '/kalkulacka'
+      path: '/kalkulacka'
+      fullPath: '/kalkulacka'
+      preLoaderRoute: typeof KalkulackaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/poptavka': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  KalkulackaRoute: KalkulackaRoute,
   ApiPoptavkaRoute: ApiPoptavkaRoute,
 }
 export const routeTree = rootRouteImport
