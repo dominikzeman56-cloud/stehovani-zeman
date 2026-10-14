@@ -120,10 +120,11 @@ function rideFill(volume: number) {
   return rest / MAX_VOLUME_M3;
 }
 
-function photoMailLine(count: number) {
+function photoMailLine(count: number, attached: boolean) {
   if (count <= 0) return "Fotky: žádné";
   const word = count === 1 ? "1 fotka" : count < 5 ? `${count} fotky` : `${count} fotek`;
-  return `Fotky: ${word}. Z počítače je prohlížeč do mailu sám nedá, je potřeba je přiložit.`;
+  // Poznámku o ručním přiložení potřebuje jen záložní mailto, na serveru jdou fotky v příloze samy.
+  return attached ? `Fotky: ${word} v příloze` : `Fotky: ${word}. Z počítače je prohlížeč do mailu sám nedá, je potřeba je přiložit.`;
 }
 
 function canSharePhotos(files: File[]) {
@@ -135,7 +136,7 @@ function canSharePhotos(files: File[]) {
   }
 }
 
-function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0, abroad: string[] = []) {
+function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0, abroad: string[] = [], attached = false) {
   const quote = computeQuote({
     cart: saved.cart,
     floorsFrom: saved.floorsFrom,
@@ -180,7 +181,7 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0, abroad:
     `Demontáž nábytku: ${saved.disassembly ? "ano" : "ne"}`,
     `Zabalit křehké: ${saved.packing ? "ano" : "ne"}`,
     saved.note.trim() ? `Přístup a poznámka: ${saved.note.trim()}` : "Přístup a poznámka: neuvedeno",
-    photoMailLine(photoCount),
+    photoMailLine(photoCount, attached),
     "",
     "ODHAD BEZ DPH",
     `Základní jízda: ${formatKc(quote.tripFee)}`,
@@ -423,6 +424,7 @@ export function Calculator() {
     }
     const files = photos.map((photo) => photo.file);
     const { body } = buildMail(saved, legs, files.length, abroad);
+    const { body: serverBody } = buildMail(saved, legs, files.length, abroad, true);
 
     // Hlavní cesta: poptávka s fotkami jde na server a přijde e-mailem. Když server není
     // nastavený nebo spadne, použije se e-mail z prohlížeče jako dřív.
@@ -432,7 +434,7 @@ export function Calculator() {
       name: saved.name.trim(),
       phone: saved.phone.trim(),
       email: saved.email.trim(),
-      body,
+      body: serverBody,
       gross: quote.gross,
       from: saved.from.trim(),
       to: saved.to.trim(),
