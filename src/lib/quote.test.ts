@@ -14,7 +14,7 @@ registerHooks({
   },
 });
 
-const { computeQuote, readManualKm } = await import("./quote.ts");
+const { computeQuote, isDistanceUnknown, readManualKm } = await import("./quote.ts");
 const { CARRY_M_PER_FLOOR, DENSE_NEGOTIATE_COUNT, FLOOR_RATES, ITEMS, MAX_VOLUME_M3, PRICE_PER_KM, TRIP_PRICE } = await import("../data/catalog.ts");
 
 type QuoteInput = Parameters<typeof computeQuote>[0];
@@ -342,5 +342,23 @@ describe("computeQuote", () => {
 
     // bez donášky se nic nemění
     assert.equal(quoteOf({ cart: { klavir: 1 } }).carry, 0);
+  });
+});
+
+describe("isDistanceUnknown", () => {
+  it("s nákladem, ale bez trasy a bez ručních km je vzdálenost neznámá", () => {
+    const quote = quoteOf({ cart: { klavir: 1 } });
+    assert.equal(quote.transport, 0);
+    assert.equal(isDistanceUnknown(quote, null), true);
+  });
+
+  it("spočítaná trasa i ruční km neznámost ruší, i ruční nula", () => {
+    assert.equal(isDistanceUnknown(quoteOf({ cart: { klavir: 1 }, legs: route }), route), false);
+    assert.equal(isDistanceUnknown(quoteOf({ cart: { klavir: 1 }, useManual: true, manualKm: 85 }), null), false);
+    assert.equal(isDistanceUnknown(quoteOf({ cart: { klavir: 1 }, useManual: true, manualKm: 0 }), null), false);
+  });
+
+  it("prázdná kalkulačka nic nedopočítává", () => {
+    assert.equal(isDistanceUnknown(quoteOf({}), null), false);
   });
 });

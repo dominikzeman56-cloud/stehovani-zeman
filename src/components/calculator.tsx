@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, ImagePlus, Loader2, Minus, Plus, Route, Search, Trash2, X } from "lucide-react";
 import { CARRY_MAX_M, CARRY_M_PER_FLOOR, CATEGORIES, COMPANY, ESTIMATE_CAVEAT, FLAT_31_M3, ITEMS, LIFT_LABEL, MAX_VOLUME_M3, PAYLOAD_KG, PRICE_PER_KM, TRIP_PRICE, WEIGHT_LABEL, fold, type LiftKind, type WeightClass } from "@/data/catalog";
-import { computeQuote, formatKc, formatKm, formatVolume, readManualKm, type Cart, type ExtraItem, type RouteLegs } from "@/lib/quote";
+import { HOME_COUNTRY, SERVED_COUNTRY_CODES, abroadCountries, nominatimUrl, parseNominatim } from "@/lib/geo";
+import { computeQuote, formatKc, formatKm, formatVolume, isDistanceUnknown, readManualKm, type Cart, type ExtraItem, type RouteLegs } from "@/lib/quote";
 import { Button } from "@/components/ui/button";
 import { AddressInput, type Point } from "@/components/address-input";
 import { cn } from "@/lib/cn";
@@ -61,14 +62,15 @@ const EMPTY: Saved = {
   extras: [],
 };
 
-async function geocode(query: string): Promise<Point | null> {
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=1`;
-  const response = await fetch(url, { headers: { "Accept-Language": "cs" } });
+async function geocodeIn(query: string, countries: string[]): Promise<Point | null> {
+  const response = await fetch(nominatimUrl(query, countries), { headers: { "Accept-Language": "cs" } });
   if (!response.ok) throw new Error("Vyhledání adresy selhalo.");
-  const data = (await response.json()) as { lat?: string; lon?: string }[];
-  const hit = data[0];
-  if (!hit?.lat || !hit.lon) return null;
-  return { lat: Number(hit.lat), lon: Number(hit.lon) };
+  return parseNominatim(await response.json());
+}
+
+// Napsaná adresa se hledá nejdřív v ČR a až když tam nic není, i v sousedních zemích.
+async function geocode(query: string): Promise<Point | null> {
+  return (await geocodeIn(query, [HOME_COUNTRY])) ?? (await geocodeIn(query, SERVED_COUNTRY_CODES));
 }
 
 async function routeLegs(from: Point, to: Point): Promise<RouteLegs> {
@@ -133,7 +135,7 @@ function canSharePhotos(files: File[]) {
   }
 }
 
-function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
+function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0, abroad: string[] = []) {
   const quote = computeQuote({
     cart: saved.cart,
     floorsFrom: saved.floorsFrom,
@@ -150,6 +152,7 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
     extras: saved.extras,
   });
   const list = quote.lines.map((line) => `  • ${line.name} ×${line.qty}  (${formatVolume(line.volume)})`).join("\n");
+  const distanceUnknown = isDistanceUnknown(quote, legs);
   const body = [
     "Dobrý den,",
     "",
@@ -169,9 +172,11 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
     `Jízdy vozu: ${quote.trips}`,
     "",
     quote.negotiate ? "POZOR: hodně beden s knihami po schodech/donášce, cenu domluvit zvlášť." : "",
+    abroad.length ? `POZOR: adresa mimo ČR (${abroad.join(", ")}), cenu jízdy potvrdit.` : "",
+    distanceUnknown ? "POZOR: vzdálenost není spočítaná, odhad je bez dopravného. Dopočítat podle adres." : "",
     `Odkud: ${saved.from || "—"} · ${LIFT_LABEL[saved.liftFrom]}, pater ${saved.floorsFrom}, donáška od vozu ${saved.carryFrom} m`,
     `Kam: ${saved.to || "—"} · ${LIFT_LABEL[saved.liftTo]}, pater ${saved.floorsTo}, donáška od vozu ${saved.carryTo} m`,
-    `Vzdálenost k fakturaci: ${formatKm(quote.distanceKm)}${quote.manual ? " (zadáno ručně)" : ""}`,
+    `Vzdálenost k fakturaci: ${distanceUnknown ? "nespočítáno" : `${formatKm(quote.distanceKm)}${quote.manual ? " (zadáno ručně)" : ""}`}`,
     `Demontáž nábytku: ${saved.disassembly ? "ano" : "ne"}`,
     `Zabalit křehké: ${saved.packing ? "ano" : "ne"}`,
     saved.note.trim() ? `Přístup a poznámka: ${saved.note.trim()}` : "Přístup a poznámka: neuvedeno",
@@ -183,7 +188,7 @@ function buildMail(saved: Saved, legs: RouteLegs | null, photoCount = 0) {
     `Patra: ${formatKc(quote.floors)}`,
     `Donáška: ${formatKc(quote.carry)}`,
     `Odpojení pračky/myčky: ${formatKc(quote.handling)}`,
-    `Dopravné: ${formatKc(quote.transport)}`,
+    `Dopravné: ${distanceUnknown ? "bude dopočteno" : formatKc(quote.transport)}`,
     `Celkem bez DPH: ${formatKc(quote.net)}`,
     `DPH 21 %: ${formatKc(quote.vat)}`,
     `Celkem s DPH: ${formatKc(quote.gross)}`,
@@ -220,6 +225,7 @@ export function Calculator() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const photosRef = useRef(photos);
   photosRef.current = photos;
+  const abroad = abroadCountries([fromPoint, toPoint]);
 
   useEffect(() => {
     // Dřívější verze ukládala rozdělaný soupis i kontakt do prohlížeče. Teď se nic neukládá,
@@ -324,15 +330,17 @@ export function Calculator() {
     }
     setRouting(true);
     try {
-      const [start, end] = await Promise.all([
-        fromPoint ?? geocode(`${from}, Česko`),
-        toPoint ?? geocode(`${to}, Česko`),
-      ]);
+      const [start, end] = await Promise.all([fromPoint ?? geocode(from), toPoint ?? geocode(to)]);
       if (!start || !end) {
-        setRouteError("Adresu se nepodařilo najít. Kilometry můžete zadat ručně.");
+        const missing = [!start && from, !end && to].filter(Boolean).map((address) => `„${address}“`);
+        setRouteError(
+          `Adresu ${missing.join(" a ")} se nepodařilo najít. Zkuste ji vybrat z nabídky, nebo kilometry zadejte ručně níže. Nejde-li ani to, pošlete poptávku i tak a dopravné vám dopočítáme podle adres.`,
+        );
         return;
       }
       const next = await routeLegs(start, end);
+      setFromPoint(start);
+      setToPoint(end);
       setLegs(next);
       patch({ useManual: false });
     } catch (error) {
@@ -414,7 +422,7 @@ export function Calculator() {
       return;
     }
     const files = photos.map((photo) => photo.file);
-    const { body } = buildMail(saved, legs, files.length);
+    const { body } = buildMail(saved, legs, files.length, abroad);
 
     // Hlavní cesta: poptávka s fotkami jde na server a přijde e-mailem. Když server není
     // nastavený nebo spadne, použije se e-mail z prohlížeče jako dřív.
@@ -462,7 +470,7 @@ export function Calculator() {
 
   async function copyQuote() {
     if (!quote.lines.length) return;
-    const { body } = buildMail(saved, legs, photos.length);
+    const { body } = buildMail(saved, legs, photos.length, abroad);
     try {
       await navigator.clipboard.writeText(body);
       setNotice("Text poptávky je ve schránce.");
@@ -476,6 +484,7 @@ export function Calculator() {
     saved.extras.reduce((sum, item) => sum + item.qty, 0);
 
   const hasRoute = quote.distanceKm > 0 || saved.useManual;
+  const distanceUnknown = isDistanceUnknown(quote, legs);
   const stepDone = [pieceCount > 0, hasRoute, Boolean(saved.name.trim() && saved.phone.trim())];
   const activeStep = stepDone.findIndex((done) => !done);
   const now = new Date();
@@ -794,6 +803,12 @@ export function Calculator() {
                   {routeError}
                 </p>
               )}
+              {abroad.length > 0 && (
+                <p className="mt-2 text-sm text-muted">
+                  Adresa mimo Česko ({abroad.join(", ")}). Kilometry spočítáme podle mapy, dopravné za zahraniční jízdu
+                  vám potvrdíme po telefonu.
+                </p>
+              )}
               <label className={cn(LABEL, "mt-4 block sm:max-w-xs")}>
                 Kilometry ručně
                 <input
@@ -1004,6 +1019,12 @@ export function Calculator() {
                   tohle je jen základ.
                 </p>
               )}
+              {abroad.length > 0 && (
+                <p className="mt-2 rounded-xl bg-white/10 px-3 py-2 text-sm text-paper">
+                  Jízda mimo Česko ({abroad.join(", ")}). Dopravné vám potvrdíme po telefonu, tohle je jen orientační
+                  základ.
+                </p>
+              )}
               <p className="text-sm text-paper/70">
                 Hmotnost {quote.weight.toLocaleString("cs-CZ")} kg
                 {quote.overweight
@@ -1028,6 +1049,12 @@ export function Calculator() {
               <Row label="Donáška od vozu" value={quote.carry} />
               <Row label="Odpojení pračky a myčky" value={quote.handling} />
               <Row label={`Dopravné ${formatKm(quote.distanceKm)}`} value={quote.transport} />
+              {distanceUnknown && (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-paper/75">Dopravné</dt>
+                  <dd className="text-paper/75">dopočítáme</dd>
+                </div>
+              )}
               <div className="calculator-total flex items-end justify-between gap-3 border-t border-accent pt-3">
                 <dt className="font-display text-lg">Bez DPH</dt>
                 <dd className="font-display text-2xl font-bold text-[#ff5a5f]">{formatKc(quote.net)}</dd>

@@ -143,6 +143,14 @@ function roundKm(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+/**
+ * Je v odhadu dopravné jen "0 Kč", protože trasu nikdo nespočítal ani nezadal?
+ * Ruční 0 km je platný vstup (`quote.manual`), tohle je jen "zatím nevíme".
+ */
+export function isDistanceUnknown(quote: Pick<Quote, "trips" | "manual">, legs: RouteLegs | null): boolean {
+  return quote.trips > 0 && !quote.manual && !legs;
+}
+
 /** Prázdné pole je 0. Nečíselný text je NaN, aby se nula nespletla s neplatným vstupem. */
 export function readManualKm(raw: string): number {
   const text = raw.trim().replace(",", ".");
