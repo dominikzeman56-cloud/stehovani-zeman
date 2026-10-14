@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPoptavkaRouteImport } from './routes/api/poptavka'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPoptavkaRoute = ApiPoptavkaRouteImport.update({
+  id: '/api/poptavka',
+  path: '/api/poptavka',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/poptavka': typeof ApiPoptavkaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/poptavka': typeof ApiPoptavkaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/poptavka': typeof ApiPoptavkaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/poptavka'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/poptavka'
+  id: '__root__' | '/' | '/api/poptavka'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiPoptavkaRoute: typeof ApiPoptavkaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/poptavka': {
+      id: '/api/poptavka'
+      path: '/api/poptavka'
+      fullPath: '/api/poptavka'
+      preLoaderRoute: typeof ApiPoptavkaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiPoptavkaRoute: ApiPoptavkaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
