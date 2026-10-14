@@ -67,6 +67,13 @@ describe("Nominatim", () => {
     assert.deepEqual(point, { lat: 47.9, lon: 15.1, country: "at" });
   });
 
+  it("přečte krátký popis nalezeného místa", () => {
+    const point = parseNominatim([
+      { lat: "47.9", lon: "15.1", display_name: "Kienberg, Pockau, Gaming, Bezirk Scheibbs, Österreich", address: { country_code: "at" } },
+    ]);
+    assert.equal(point?.label, "Kienberg, Pockau, Gaming");
+  });
+
   it("bez země vrátí jen souřadnice", () => {
     assert.deepEqual(parseNominatim([{ lat: "49.1", lon: "15" }]), { lat: 49.1, lon: 15 });
   });

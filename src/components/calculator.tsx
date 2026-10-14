@@ -787,6 +787,13 @@ export function Calculator() {
                 {legs && !saved.useManual && (
                   <p className="text-sm text-muted">
                     Nájezd {formatKm(legs.approachKm)}, stěhování {formatKm(legs.moveKm)}, návrat {formatKm(legs.returnKm)}.
+                    {fromPoint?.label && toPoint?.label && (
+                      <>
+                        {" "}
+                        Adresy jsme našli takto: <strong className="font-medium text-ink">{fromPoint.label}</strong> →{" "}
+                        <strong className="font-medium text-ink">{toPoint.label}</strong>. Nesedí? Vyberte adresu z nabídky.
+                      </>
+                    )}
                     {saved.from && saved.to && (
                       <>
                         {" "}

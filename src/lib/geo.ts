@@ -1,5 +1,5 @@
 /** Bod na mapě. `country` je ISO kód malými písmeny (cz, at, ...), když ho zdroj adresy uvedl. */
-export type Point = { lat: number; lon: number; country?: string };
+export type Point = { lat: number; lon: number; country?: string; label?: string };
 
 /** Země, kam stěhování bere hledání adres. Zbytek světa se z návrhů zahazuje. */
 export const COUNTRY_NAMES: Record<string, string> = {
@@ -64,7 +64,7 @@ export function nominatimUrl(query: string, countries: string[]): string {
 
 export const SERVED_COUNTRY_CODES = Object.keys(COUNTRY_NAMES);
 
-type NominatimHit = { lat?: string; lon?: string; address?: { country_code?: string } };
+type NominatimHit = { lat?: string; lon?: string; display_name?: string; address?: { country_code?: string } };
 
 /** První použitelný nález z odpovědi Nominatimu, nebo null. */
 export function parseNominatim(data: unknown): Point | null {
@@ -75,5 +75,7 @@ export function parseNominatim(data: unknown): Point | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   const country = normalizeCountry(hit.address?.country_code);
   if (!isServedCountry(country)) return null;
-  return country ? { lat, lon, country } : { lat, lon };
+  // Krátký popis nalezeného místa, ať zákazník vidí, kam se napsaná adresa opravdu trefila.
+  const label = hit.display_name?.split(",").slice(0, 3).join(",").trim() || undefined;
+  return { lat, lon, ...(country ? { country } : {}), ...(label ? { label } : {}) };
 }

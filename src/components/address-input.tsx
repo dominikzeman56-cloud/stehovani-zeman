@@ -43,12 +43,11 @@ function toSuggestion(feature: PhotonFeature): Suggestion | null {
   ]
     .filter(Boolean)
     .join(", ");
-  const point: Point = country ? { lat: coords[1], lon: coords[0], country } : { lat: coords[1], lon: coords[0] };
-  return {
-    label: [label, place && place !== label ? place : "", abroad].filter(Boolean).join(", "),
-    detail,
-    point,
-  };
+  const full = [label, place && place !== label ? place : "", abroad].filter(Boolean).join(", ");
+  const point: Point = country
+    ? { lat: coords[1], lon: coords[0], country, label: full }
+    : { lat: coords[1], lon: coords[0], label: full };
+  return { label: full, detail, point };
 }
 
 async function search(query: string, signal: AbortSignal): Promise<Suggestion[]> {
