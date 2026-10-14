@@ -2,8 +2,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Loader2, MapPin } from "lucide-react";
 import { COMPANY } from "@/data/catalog";
 import { cn } from "@/lib/cn";
+import { SEARCH_BBOX, countryName, isAbroad, isServedCountry, normalizeCountry, type Point } from "@/lib/geo";
 
-export type Point = { lat: number; lon: number };
+export type { Point };
 
 type Suggestion = { label: string; detail: string; point: Point };
 
@@ -23,28 +24,37 @@ type PhotonFeature = {
   };
 };
 
-// Přibližný obdélník ČR, ať našeptávač nenavrhuje Vídeň ani Mnichov.
-const CZ_BBOX = "12.09,48.55,18.86,51.06";
-
 function toSuggestion(feature: PhotonFeature): Suggestion | null {
   const p = feature.properties;
   const coords = feature.geometry?.coordinates;
-  if (!p || !coords || (p.countrycode && p.countrycode !== "CZ")) return null;
+  if (!p || !coords || !isServedCountry(p.countrycode)) return null;
+  const country = normalizeCountry(p.countrycode);
   const place = p.city ?? p.town ?? p.village ?? p.district ?? p.county ?? "";
   const street = p.street ? `${p.street}${p.housenumber ? ` ${p.housenumber}` : ""}` : "";
   const label = street || p.name || place;
   if (!label) return null;
-  const detail = [street && p.name && p.name !== street ? p.name : "", place !== label ? place : "", p.postcode ?? ""]
+  // Zemi píšeme jen u adres mimo ČR. Do poptávky tak jde "Kienberg, Gaming, Rakousko", ne jen "Kienberg".
+  const abroad = isAbroad(country) ? countryName(country) : "";
+  const detail = [
+    street && p.name && p.name !== street ? p.name : "",
+    place !== label ? place : "",
+    p.postcode ?? "",
+    abroad,
+  ]
     .filter(Boolean)
     .join(", ");
-  return { label: [label, place && place !== label ? place : ""].filter(Boolean).join(", "), detail, point: { lat: coords[1], lon: coords[0] } };
+  const full = [label, place && place !== label ? place : "", abroad].filter(Boolean).join(", ");
+  const point: Point = country
+    ? { lat: coords[1], lon: coords[0], country, label: full }
+    : { lat: coords[1], lon: coords[0], label: full };
+  return { label: full, detail, point };
 }
 
 async function search(query: string, signal: AbortSignal): Promise<Suggestion[]> {
   const params = new URLSearchParams({
     q: query,
     limit: "6",
-    bbox: CZ_BBOX,
+    bbox: SEARCH_BBOX,
     lat: String(COMPANY.depot.lat),
     lon: String(COMPANY.depot.lon),
   });
